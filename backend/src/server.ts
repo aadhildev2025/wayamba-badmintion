@@ -17,11 +17,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB on incoming request
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
+});
 
 // Middleware
-app.use(cors({ origin: '*' })); // Enable CORS for Next.js client
+app.use(cors({ origin: '*' })); // Enable CORS for Next.js / Vite client
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -48,6 +51,9 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/reports', reportRoutes);
 
 // Health check endpoint
+app.get('/api', (req, res) => {
+  res.json({ message: 'Wayamba Badminton Home API is running...' });
+});
 app.get('/', (req, res) => {
   res.json({ message: 'Wayamba Badminton Home API is running...' });
 });
@@ -61,7 +67,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+// Start server only in non-Vercel environment
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server is running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  });
+}
+
+export default app;
+

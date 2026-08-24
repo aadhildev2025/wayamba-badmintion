@@ -192,6 +192,7 @@ export default function AdminCoupons() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
           {coupons.map((coupon, i) => {
             const isExpired = new Date(coupon.expiryDate) < new Date();
+            const usageExhausted = coupon.usageLimit ? coupon.usageCount >= coupon.usageLimit : false;
 
             return (
               <motion.div

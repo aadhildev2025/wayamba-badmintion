@@ -19,10 +19,13 @@ dotenv_1.default.config();
 // Create Express app
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
-// Connect to MongoDB
-(0, db_1.connectDB)();
+// Connect to MongoDB on incoming request
+app.use(async (req, res, next) => {
+    await (0, db_1.connectDB)();
+    next();
+});
 // Middleware
-app.use((0, cors_1.default)({ origin: '*' })); // Enable CORS for Next.js client
+app.use((0, cors_1.default)({ origin: '*' })); // Enable CORS for Next.js / Vite client
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 // Serve uploaded static images
@@ -34,10 +37,21 @@ app.use('/uploads', express_1.default.static(path_1.default.join(publicDir, 'upl
 // Routes
 app.use('/api/auth', authRoutes_1.default);
 app.use('/api/products', productRoutes_1.default);
+app.use('/api/categories', (req, res, next) => {
+    req.url = '/categories' + req.url;
+    (0, productRoutes_1.default)(req, res, next);
+});
+app.use('/api/brands', (req, res, next) => {
+    req.url = '/brands' + req.url;
+    (0, productRoutes_1.default)(req, res, next);
+});
 app.use('/api/orders', orderRoutes_1.default);
 app.use('/api/coupons', couponRoutes_1.default);
 app.use('/api/reports', reportRoutes_1.default);
 // Health check endpoint
+app.get('/api', (req, res) => {
+    res.json({ message: 'Wayamba Badminton Home API is running...' });
+});
 app.get('/', (req, res) => {
     res.json({ message: 'Wayamba Badminton Home API is running...' });
 });
@@ -49,7 +63,10 @@ app.use((err, req, res, next) => {
         stack: process.env.NODE_ENV === 'development' ? err.stack : {},
     });
 });
-// Start server
-app.listen(PORT, () => {
-    console.log(`Server is running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+// Start server only in non-Vercel environment
+if (process.env.VERCEL !== '1') {
+    app.listen(PORT, () => {
+        console.log(`Server is running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+    });
+}
+exports.default = app;

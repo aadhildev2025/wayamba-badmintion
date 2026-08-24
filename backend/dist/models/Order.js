@@ -49,7 +49,7 @@ const ShippingAddressSchema = new mongoose_1.Schema({
     district: { type: String, required: true },
 }, { _id: false });
 const OrderSchema = new mongoose_1.Schema({
-    user: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: false },
     items: [OrderItemSchema],
     shippingAddress: { type: ShippingAddressSchema, required: true },
     deliveryCharge: { type: Number, required: true, default: 0 },

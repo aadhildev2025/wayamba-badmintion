@@ -162,6 +162,7 @@ router.get('/', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+const mongoose_1 = __importDefault(require("mongoose"));
 // GET single product by slug
 router.get('/slug/:slug', async (req, res) => {
     try {
@@ -196,19 +197,62 @@ router.get('/id/:id', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
-// POST upload multiple images
-router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), uploadMiddleware_1.upload.array('images', 5), (req, res) => {
+// GET single product by ID or Slug (Direct fallback)
+router.get('/:idOrSlug', async (req, res) => {
     try {
-        if (!req.files || req.files.length === 0) {
-            res.status(400).json({ message: 'No images uploaded' });
+        const { idOrSlug } = req.params;
+        let product;
+        if (mongoose_1.default.Types.ObjectId.isValid(idOrSlug)) {
+            product = await Product_1.default.findById(idOrSlug).populate('category').populate('brand');
+        }
+        if (!product) {
+            product = await Product_1.default.findOne({ slug: idOrSlug }).populate('category').populate('brand');
+        }
+        if (!product) {
+            res.status(404).json({ message: 'Product not found' });
             return;
         }
-        const filePaths = req.files.map(file => `/uploads/${file.filename}`);
-        res.json({ urls: filePaths });
+        const reviews = await Review_1.default.find({ product: product._id }).populate('user', 'name');
+        res.json({ product, reviews });
     }
     catch (error) {
         res.status(500).json({ message: error.message });
     }
+});
+// GET reviews by product ID or Slug
+router.get('/:idOrSlug/reviews', async (req, res) => {
+    try {
+        const { idOrSlug } = req.params;
+        let product;
+        if (mongoose_1.default.Types.ObjectId.isValid(idOrSlug)) {
+            product = await Product_1.default.findById(idOrSlug);
+        }
+        if (!product) {
+            product = await Product_1.default.findOne({ slug: idOrSlug });
+        }
+        if (!product) {
+            res.status(404).json({ message: 'Product not found' });
+            return;
+        }
+        const reviews = await Review_1.default.find({ product: product._id }).populate('user', 'name');
+        res.json(reviews);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+// POST upload multiple images
+router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (req, res) => {
+    uploadMiddleware_1.upload.array('images', 10)(req, res, (err) => {
+        if (err) {
+            return res.status(400).json({ message: err.message || 'Image upload failed' });
+        }
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ message: 'No image files provided' });
+        }
+        const filePaths = req.files.map(file => `/uploads/${file.filename}`);
+        return res.json({ urls: filePaths, imageUrls: filePaths });
+    });
 });
 // POST create product (Super Admin & Staff)
 router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
@@ -292,28 +336,40 @@ router.delete('/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)
 // ==========================================
 // PRODUCT REVIEWS
 // ==========================================
-// POST add a product review
-router.post('/:id/reviews', authMiddleware_1.protect, async (req, res) => {
+// POST add a product review (supports slug or id)
+router.post('/:idOrSlug/reviews', authMiddleware_1.optionalAuth, async (req, res) => {
     try {
-        const { rating, comment } = req.body;
-        const productId = req.params.id;
-        const product = await Product_1.default.findById(productId);
+        const { rating, comment, name } = req.body;
+        const { idOrSlug } = req.params;
+        if (!rating || Number(rating) < 1 || Number(rating) > 5) {
+            res.status(400).json({ message: 'Rating must be between 1 and 5 stars' });
+            return;
+        }
+        let product;
+        if (mongoose_1.default.Types.ObjectId.isValid(idOrSlug)) {
+            product = await Product_1.default.findById(idOrSlug);
+        }
+        if (!product) {
+            product = await Product_1.default.findOne({ slug: idOrSlug });
+        }
         if (!product) {
             res.status(404).json({ message: 'Product not found' });
             return;
         }
-        const reviewExists = await Review_1.default.findOne({ user: req.user?.id, product: productId });
-        if (reviewExists) {
-            res.status(400).json({ message: 'You have already reviewed this product' });
-            return;
-        }
+        const reviewerName = name?.trim() || (req.user ? 'Verified Customer' : 'Anonymous Player');
         const review = await Review_1.default.create({
-            user: req.user?.id,
-            product: productId,
+            user: req.user?.id || undefined,
+            name: reviewerName,
+            product: product._id,
             rating: Number(rating),
-            comment
+            comment: comment?.trim() || ''
         });
-        res.status(201).json(review);
+        const allReviews = await Review_1.default.find({ product: product._id }).sort({ createdAt: -1 });
+        res.status(201).json({
+            message: 'Review submitted successfully',
+            review,
+            reviews: allReviews
+        });
     }
     catch (error) {
         res.status(500).json({ message: error.message });

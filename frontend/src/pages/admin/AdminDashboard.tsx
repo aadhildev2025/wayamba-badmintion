@@ -4,16 +4,15 @@ import { useAuth } from '@/context/AuthContext';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, ShoppingBag, Package, Users,
-  BarChart2, Tag, LogOut, Menu, X, Plus, Bell, CheckCheck,
-  TrendingUp, Clock, AlertCircle, ChevronRight, ArrowRight,
-  Shield, Zap, CheckCircle2, ArrowUpRight, Activity
+  BarChart2, LogOut, Menu, X, Plus, Bell, CheckCheck,
+  TrendingUp, AlertCircle, ChevronRight,
+  CheckCircle2, ArrowUpRight
 } from 'lucide-react';
 import api from '@/lib/api';
 import AdminOrders from './AdminOrders';
 import AdminProducts from './AdminProducts';
 import AdminCustomers from './AdminCustomers';
 import AdminReports from './AdminReports';
-import AdminCoupons from './AdminCoupons';
 
 const NAV = [
   { icon: LayoutDashboard, label: 'Overview',  path: '' },
@@ -28,11 +27,8 @@ function Overview({ user }: { user: { name: string; role: string } }) {
   const [summary, setSummary] = useState<any>(null);
   const [lowStock, setLowStock] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
-  const [bestSellers, setBestSellers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
     const getDashboard = api.get('/reports/dashboard');
     const getOrders = api.get('/orders');
 
@@ -40,12 +36,10 @@ function Overview({ user }: { user: { name: string; role: string } }) {
       .then(([dashRes, orderRes]) => {
         setSummary(dashRes.data.summary);
         setLowStock(dashRes.data.lowStockAlerts || []);
-        setBestSellers(dashRes.data.bestSellers || []);
         const rawOrders = Array.isArray(orderRes.data) ? orderRes.data : orderRes.data?.orders || [];
         setRecentOrders(rawOrders.slice(0, 5));
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(console.error);
   }, []);
 
   const KPI = [

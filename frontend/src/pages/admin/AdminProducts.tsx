@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit2, Trash2, X, AlertTriangle, RefreshCw, UploadCloud, ImageIcon, Upload, Check } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { Search, Plus, Edit2, Trash2, X, AlertTriangle, RefreshCw, UploadCloud, ImageIcon } from 'lucide-react';
 import api from '@/lib/api';
+
 
 interface Brand {
   _id: string;
@@ -38,8 +38,6 @@ interface Product {
 }
 
 export default function AdminProducts() {
-  const { user } = useAuth();
-  
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -109,12 +107,6 @@ export default function AdminProducts() {
     setImageInput(filtered.join(', '));
   };
 
-  const handleAddPresetImage = (presetUrl: string) => {
-    const currentList = imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean) : [];
-    if (!currentList.includes(presetUrl)) {
-      setImageInput([...currentList, presetUrl].join(', '));
-    }
-  };
 
   const fetchLists = () => {
     setLoading(true);

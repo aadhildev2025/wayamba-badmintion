@@ -6,15 +6,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.connectDB = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const connectDB = async () => {
+    if (mongoose_1.default.connection.readyState >= 1) {
+        return;
+    }
     try {
         const connUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/wayamba_badminton';
-        console.log(`Attempting to connect to MongoDB at: ${connUri}`);
+        console.log('Connecting to MongoDB...');
         await mongoose_1.default.connect(connUri);
-        console.log(`MongoDB Connected successfully!`);
+        console.log('MongoDB Connected successfully!');
     }
     catch (error) {
         console.error('Error connecting to MongoDB:', error);
-        process.exit(1);
     }
 };
 exports.connectDB = connectDB;

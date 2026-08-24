@@ -234,4 +234,26 @@ router.post('/staff', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)
         res.status(500).json({ message: error.message });
     }
 });
+// @route   PUT /api/auth/staff/:id/password
+// @desc    Update password for staff member or admin (Super Admin only)
+router.put('/staff/:id/password', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN'), async (req, res) => {
+    try {
+        const { password } = req.body;
+        if (!password || password.length < 6) {
+            res.status(400).json({ message: 'Password must be at least 6 characters long' });
+            return;
+        }
+        const user = await User_1.default.findById(req.params.id);
+        if (!user) {
+            res.status(404).json({ message: 'Staff user not found' });
+            return;
+        }
+        user.password = password;
+        await user.save();
+        res.json({ message: 'Password updated successfully' });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 exports.default = router;

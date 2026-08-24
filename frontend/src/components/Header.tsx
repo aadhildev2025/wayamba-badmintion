@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, Menu, X, Sun, Moon, ShoppingCart, Phone, Sparkles, Command } from 'lucide-react';
+import { Search, Menu, X, Sun, Moon, ShoppingCart, Phone, Sparkles } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useCart } from '@/context/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';

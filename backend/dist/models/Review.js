@@ -35,11 +35,11 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
 const ReviewSchema = new mongoose_1.Schema({
-    user: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: false },
+    name: { type: String, required: true, trim: true },
     product: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Product', required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },
     comment: { type: String, default: '', trim: true },
 }, { timestamps: true });
-// Prevent a user from leaving multiple reviews for a single product
-ReviewSchema.index({ user: 1, product: 1 }, { unique: true });
+ReviewSchema.index({ product: 1, createdAt: -1 });
 exports.default = mongoose_1.default.model('Review', ReviewSchema);
