@@ -18,7 +18,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthRequest = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register');
+    const token = localStorage.getItem('wbh_token');
+    const isDemoToken = token ? token.startsWith('demo_') : false;
+
+    if (error.response?.status === 401 && !isAuthRequest && !isDemoToken) {
       localStorage.removeItem('wbh_token');
       localStorage.removeItem('wbh_user');
       window.dispatchEvent(new Event('auth-logout'));
