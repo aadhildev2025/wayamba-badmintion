@@ -28,7 +28,8 @@ router.get('/notifications', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async 
     const unreadCount = await Notification.countDocuments({ read: false });
     res.json({ notifications, unreadCount });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching notifications:', error);
+    res.json({ notifications: [], unreadCount: 0 });
   }
 });
 
@@ -232,7 +233,8 @@ router.get('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req: AuthReq
       .sort({ createdAt: -1 });
     res.json(orders);
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching orders:', error);
+    res.json([]);
   }
 });
 

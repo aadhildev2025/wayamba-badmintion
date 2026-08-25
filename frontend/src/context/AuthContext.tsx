@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Demo Admin & Staff Fallback for offline or fresh database instances
       const lowerEmail = email.toLowerCase().trim();
       if ((lowerEmail === 'admin@wbh.com' || lowerEmail === 'admin') && password === 'admin123') {
-        const demoUser: User = { id: 'super-admin-1', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317' };
+        const demoUser: User = { id: '650000000000000000000001', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317' };
         localStorage.setItem('wbh_token', 'demo_admin_jwt_token_999');
         localStorage.setItem('wbh_user', JSON.stringify(demoUser));
         setToken('demo_admin_jwt_token_999');
@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return demoUser;
       }
       if ((lowerEmail === 'staff@wbh.com' || lowerEmail === 'staff') && password === 'staff123') {
-        const demoUser: User = { id: 'staff-user-1', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567' };
+        const demoUser: User = { id: '650000000000000000000002', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567' };
         localStorage.setItem('wbh_token', 'demo_staff_jwt_token_888');
         localStorage.setItem('wbh_user', JSON.stringify(demoUser));
         setToken('demo_staff_jwt_token_888');

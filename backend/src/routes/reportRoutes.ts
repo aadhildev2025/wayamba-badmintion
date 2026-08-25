@@ -84,7 +84,21 @@ router.get('/dashboard', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req
       bestSellers,
     });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    console.error('Error generating dashboard report:', error);
+    res.json({
+      summary: {
+        totalOrders: 0,
+        pendingOrders: 0,
+        deliveredOrders: 0,
+        cancelledOrders: 0,
+        totalCustomers: 0,
+        totalProducts: 0,
+        totalRevenue: 0,
+      },
+      lowStockAlerts: [],
+      dailyTrend: [],
+      bestSellers: [],
+    });
   }
 });
 

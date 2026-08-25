@@ -20,11 +20,11 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
   }
 
   if (token === 'demo_admin_jwt_token_999') {
-    req.user = { id: 'super-admin-1', role: 'SUPER_ADMIN' };
+    req.user = { id: '650000000000000000000001', role: 'SUPER_ADMIN' };
     return next();
   }
   if (token === 'demo_staff_jwt_token_888') {
-    req.user = { id: 'staff-user-1', role: 'STAFF' };
+    req.user = { id: '650000000000000000000002', role: 'STAFF' };
     return next();
   }
 
@@ -52,9 +52,9 @@ export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFu
 
   if (token) {
     if (token === 'demo_admin_jwt_token_999') {
-      req.user = { id: 'super-admin-1', role: 'SUPER_ADMIN' };
+      req.user = { id: '650000000000000000000001', role: 'SUPER_ADMIN' };
     } else if (token === 'demo_staff_jwt_token_888') {
-      req.user = { id: 'staff-user-1', role: 'STAFF' };
+      req.user = { id: '650000000000000000000002', role: 'STAFF' };
     } else {
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_badminton_key_123!') as {

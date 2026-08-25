@@ -7,7 +7,9 @@ export const connectDB = async (): Promise<void> => {
   try {
     const connUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/wayamba_badminton';
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(connUri);
+    await mongoose.connect(connUri, {
+      serverSelectionTimeoutMS: 5000,
+    });
     console.log('MongoDB Connected successfully!');
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
