@@ -38,11 +38,16 @@ app.use(async (req, res, next) => {
     next();
 });
 // Serve uploaded static images
-const publicDir = path_1.default.join(__dirname, '../public');
-if (!fs_1.default.existsSync(path_1.default.join(publicDir, 'uploads'))) {
-    fs_1.default.mkdirSync(path_1.default.join(publicDir, 'uploads'), { recursive: true });
+try {
+    const publicDir = path_1.default.join(__dirname, '../public');
+    if (!fs_1.default.existsSync(path_1.default.join(publicDir, 'uploads'))) {
+        fs_1.default.mkdirSync(path_1.default.join(publicDir, 'uploads'), { recursive: true });
+    }
+    app.use('/uploads', express_1.default.static(path_1.default.join(publicDir, 'uploads')));
 }
-app.use('/uploads', express_1.default.static(path_1.default.join(publicDir, 'uploads')));
+catch {
+    // Read-only filesystem in serverless environments
+}
 // Routes
 app.use('/api/auth', authRoutes_1.default);
 app.use('/api/products', productRoutes_1.default);

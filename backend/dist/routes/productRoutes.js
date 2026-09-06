@@ -299,7 +299,14 @@ router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ message: 'No image files provided' });
         }
-        const filePaths = req.files.map(file => `/uploads/${file.filename}`);
+        const files = req.files;
+        const filePaths = files.map(file => {
+            if (file.buffer) {
+                const mime = file.mimetype || 'image/jpeg';
+                return `data:${mime};base64,${file.buffer.toString('base64')}`;
+            }
+            return `/uploads/${file.filename}`;
+        });
         return res.json({ urls: filePaths, imageUrls: filePaths });
     });
 });

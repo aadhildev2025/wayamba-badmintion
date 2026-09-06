@@ -40,11 +40,15 @@ app.use(async (req, res, next) => {
 
 
 // Serve uploaded static images
-const publicDir = path.join(__dirname, '../public');
-if (!fs.existsSync(path.join(publicDir, 'uploads'))) {
-  fs.mkdirSync(path.join(publicDir, 'uploads'), { recursive: true });
+try {
+  const publicDir = path.join(__dirname, '../public');
+  if (!fs.existsSync(path.join(publicDir, 'uploads'))) {
+    fs.mkdirSync(path.join(publicDir, 'uploads'), { recursive: true });
+  }
+  app.use('/uploads', express.static(path.join(publicDir, 'uploads')));
+} catch {
+  // Read-only filesystem in serverless environments
 }
-app.use('/uploads', express.static(path.join(publicDir, 'uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
