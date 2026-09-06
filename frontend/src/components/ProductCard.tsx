@@ -39,8 +39,9 @@ export default function ProductCard({ product }: { product: Product }) {
   const discount = isOnSale && regularPrice > 0 ? Math.round((1 - salePriceVal / regularPrice) * 100) : 0;
   const inStock = product.stockQuantity > 0;
   const stockPct = Math.min(100, Math.max(0, (product.stockQuantity / 20) * 100));
-  const rating = product.averageRating ?? 4.9;
-  const reviews = product.reviewCount ?? 24;
+  const rating = product.averageRating;
+  const reviews = product.reviewCount || 0;
+  const hasReviews = typeof reviews === 'number' && reviews > 0;
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -76,52 +77,43 @@ export default function ProductCard({ product }: { product: Product }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0.8 }}
             transition={{ duration: 0.25 }}
-            onError={e => { (e.target as HTMLImageElement).src = '/imgs/hero_rackets.png'; }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/imgs/hero_rackets.png';
+            }}
           />
         </AnimatePresence>
 
-        {isOnSale && (
-          <span className="pcard-sale">
-            −{discount}% OFF
-          </span>
-        )}
-        {!isOnSale && product.isFeatured && (
-          <span className="pcard-new">
-            ✦ PRO CHOICE
-          </span>
-        )}
+        {/* Badges */}
+        <div className="pcard-badges">
+          {product.isFeatured && (
+            <span className="pcard-badge pcard-badge-feat">Featured</span>
+          )}
+          {isOnSale && (
+            <span className="pcard-badge pcard-badge-sale">-{discount}% OFF</span>
+          )}
+        </div>
 
+        {/* Quick Actions overlay */}
         <div className="pcard-overlay">
-          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+          <div className="pcard-actions">
             <motion.button
-              whileTap={{ scale: 0.96 }}
-              className={`pcard-action ${added ? 'done' : ''}`}
-              style={{ flex: 1, justifyContent: 'center' }}
-              onClick={handleAdd}
-              aria-label="Add to cart"
-            >
-              {added ? (
-                <>
-                  <Check size={15} /> Added!
-                </>
-              ) : (
-                <>
-                  <ShoppingCart size={15} /> Add to Cart
-                </>
-              )}
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.94 }}
-              className="pcard-action"
-              style={{ padding: '11px 14px' }}
-              onClick={e => {
-                e.preventDefault();
+              whileTap={{ scale: 0.9 }}
+              className="pcard-action-btn"
+              onClick={(e) => {
                 e.stopPropagation();
                 setQuickViewOpen(true);
               }}
               aria-label="Quick view product"
             >
               <Eye size={15} />
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              className={`pcard-action-btn ${added ? 'done' : ''}`}
+              onClick={handleAdd}
+              aria-label="Add to cart"
+            >
+              {added ? <Check size={15} /> : <ShoppingCart size={15} />}
             </motion.button>
           </div>
         </div>
@@ -135,21 +127,27 @@ export default function ProductCard({ product }: { product: Product }) {
 
         <div className="pcard-name">{product.name}</div>
 
-        {/* Stars Pill */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <div style={{ display: 'flex', gap: 2 }}>
-            {[1, 2, 3, 4, 5].map(s => (
-              <Star
-                key={s}
-                size={11}
-                style={{
-                  fill: s <= Math.round(rating) ? 'var(--warning)' : 'transparent',
-                  color: s <= Math.round(rating) ? 'var(--warning)' : 'var(--t4)',
-                }}
-              />
-            ))}
-          </div>
-          <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 600 }}>({reviews})</span>
+        {/* Stars Pill (Only shown if real reviews exist) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, minHeight: 18 }}>
+          {hasReviews ? (
+            <>
+              <div style={{ display: 'flex', gap: 2 }}>
+                {[1, 2, 3, 4, 5].map(s => (
+                  <Star
+                    key={s}
+                    size={11}
+                    style={{
+                      fill: s <= Math.round(rating || 5) ? 'var(--warning)' : 'transparent',
+                      color: s <= Math.round(rating || 5) ? 'var(--warning)' : 'var(--t4)',
+                    }}
+                  />
+                ))}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 600 }}>({reviews})</span>
+            </>
+          ) : (
+            <span style={{ fontSize: 10.5, color: 'var(--t4)', fontWeight: 500 }}>No reviews yet</span>
+          )}
         </div>
 
         {/* Price Tag */}

@@ -250,26 +250,41 @@ export default function ProductDetail() {
             <h1 className="display-md" style={{ color: 'var(--t1)' }}>{product.name}</h1>
 
             {/* Rating */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: 3 }}>
-                {[1, 2, 3, 4, 5].map(s => (
-                  <Star key={s} size={15} style={{ fill: s <= Math.round(product.averageRating || 4.9) ? 'var(--warning)' : 'transparent', color: s <= Math.round(product.averageRating || 4.9) ? 'var(--warning)' : 'var(--t4)' }} />
-                ))}
-              </div>
-              <span style={{ fontSize: 13, color: 'var(--t3)', fontWeight: 600 }}>({reviews.length || product.reviewCount || 0} customer reviews)</span>
-              <button
-                onClick={() => setShowReviewModal(true)}
-                style={{
-                  background: 'rgba(176,28,40,0.12)', border: '1px solid rgba(176,28,40,0.35)',
-                  color: 'var(--red-vivid)', padding: '5px 14px', borderRadius: 99,
-                  fontSize: 12, fontWeight: 700, fontFamily: 'Outfit', cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 5, marginLeft: 6,
-                  transition: 'all 0.2s',
-                }}
-              >
-                <MessageSquarePlus size={14} /> Write Review
-              </button>
-            </div>
+            {(() => {
+              const revCount = reviews.length || product.reviewCount || 0;
+              const computedAvg = reviews.length > 0
+                ? Number((reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1))
+                : (product.averageRating || 0);
+
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {revCount > 0 ? (
+                    <>
+                      <div style={{ display: 'flex', gap: 3 }}>
+                        {[1, 2, 3, 4, 5].map(s => (
+                          <Star key={s} size={15} style={{ fill: s <= Math.round(computedAvg) ? 'var(--warning)' : 'transparent', color: s <= Math.round(computedAvg) ? 'var(--warning)' : 'var(--t4)' }} />
+                        ))}
+                      </div>
+                      <span style={{ fontSize: 13, color: 'var(--t3)', fontWeight: 600 }}>({computedAvg} • {revCount} {revCount === 1 ? 'review' : 'reviews'})</span>
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 13, color: 'var(--t4)', fontWeight: 500 }}>No reviews yet</span>
+                  )}
+                  <button
+                    onClick={() => setShowReviewModal(true)}
+                    style={{
+                      background: 'rgba(176,28,40,0.12)', border: '1px solid rgba(176,28,40,0.35)',
+                      color: 'var(--red-vivid)', padding: '5px 14px', borderRadius: 99,
+                      fontSize: 12, fontWeight: 700, fontFamily: 'Outfit', cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', gap: 5, marginLeft: 6,
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <MessageSquarePlus size={14} /> Write Review
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Price */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>

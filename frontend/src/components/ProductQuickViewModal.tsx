@@ -177,14 +177,20 @@ export default function ProductQuickViewModal({ product, isOpen, onClose }: Prod
 
               {/* Rating & Stock Status */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {[1, 2, 3, 4, 5].map(s => (
-                    <Star key={s} size={14} style={{ fill: s <= Math.round(product.averageRating || 5) ? '#F59E0B' : 'transparent', color: s <= Math.round(product.averageRating || 5) ? '#F59E0B' : 'rgba(255,255,255,0.2)' }} />
-                  ))}
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF', marginLeft: 4, fontFamily: 'Outfit' }}>
-                    {product.averageRating || 5.0} ({product.reviewCount || 48} reviews)
+                {product.reviewCount && product.reviewCount > 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <Star key={s} size={14} style={{ fill: s <= Math.round(product.averageRating || 5) ? '#F59E0B' : 'transparent', color: s <= Math.round(product.averageRating || 5) ? '#F59E0B' : 'rgba(255,255,255,0.2)' }} />
+                    ))}
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF', marginLeft: 4, fontFamily: 'Outfit' }}>
+                      {product.averageRating} ({product.reviewCount} {product.reviewCount === 1 ? 'review' : 'reviews'})
+                    </span>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)', fontFamily: 'Outfit' }}>
+                    No reviews yet
                   </span>
-                </div>
+                )}
                 <span style={{
                   fontSize: 11.5, fontWeight: 800, padding: '3px 10px', borderRadius: 99,
                   background: inStock ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',

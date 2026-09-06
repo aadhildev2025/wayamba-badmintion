@@ -56,7 +56,7 @@ const SLIDES = [
 
 /* ── Fallback Data ── */
 export const FALLBACK_PRODUCTS: any[] = [
-  { _id:'p1', name:'Yonex Astrox 100ZZ Kurenai', slug:'yonex-astrox-100zz-kurenai', price:58500, salePrice:55000, stockQuantity:12, images:[{url:'/imgs/hero_rackets.png'}], brand:{name:'Yonex'}, category:{name:'Badminton Rackets'}, isFeatured:true, averageRating:5.0, reviewCount:48 },
+  { _id:'p1', name:'Yonex Astrox 100ZZ Kurenai', slug:'yonex-astrox-100zz-kurenai', price:58500, salePrice:55000, stockQuantity:12, images:[{url:'/imgs/hero_rackets.png'}], brand:{name:'Yonex'}, category:{name:'Badminton Rackets'}, isFeatured:true, averageRating:0, reviewCount:0 },
 ];
 
 export const FALLBACK_CATEGORIES: any[] = [

@@ -70,17 +70,65 @@ export default function AdminProducts() {
   const [specKey, setSpecKey] = useState('');
   const [specVal, setSpecVal] = useState('');
 
+  // Fast client-side image compressor before uploading to server/Cloudinary
+  const compressImageFile = async (file: File, maxDimension = 1400, quality = 0.85): Promise<File> => {
+    if (!file.type.startsWith('image/') || file.size < 200 * 1024) {
+      return file; // If already tiny or non-image, skip compression
+    }
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(file);
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return resolve(file);
+            const compressed = new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.webp', {
+              type: 'image/webp',
+              lastModified: Date.now(),
+            });
+            resolve(compressed);
+          },
+          'image/webp',
+          quality
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      img.src = url;
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setUploadingImage(true);
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append('images', files[i]);
-    }
-
     try {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        const compressed = await compressImageFile(files[i]);
+        formData.append('images', compressed);
+      }
+
       const res = await api.post('/products/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -219,6 +267,7 @@ export default function AdminProducts() {
         setProducts(prev => [data, ...prev]);
       }
       setModalOpen(false);
+      fetchLists();
     } catch (err: any) {
       console.error(err);
       alert(err.response?.data?.message || 'Failed to save product');

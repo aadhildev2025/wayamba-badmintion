@@ -330,7 +330,9 @@ router.post('/upload', protect, restrictTo('SUPER_ADMIN', 'STAFF'), (req, res) =
             const mime = file.mimetype || 'image/jpeg';
             return `data:${mime};base64,${file.buffer.toString('base64')}`;
           }
-          return `/uploads/${file.filename}`;
+          const host = req.get('host') || 'localhost:5000';
+          const protocol = req.protocol || 'http';
+          return `${protocol}://${host}/uploads/${file.filename}`;
         })
       );
       return res.json({ urls: fileUrls, imageUrls: fileUrls });
@@ -370,7 +372,8 @@ router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) =
       specifications
     });
 
-    res.status(201).json(product);
+    const populated = await Product.findById(product._id).populate('brand').populate('category');
+    res.status(201).json(populated || product);
   } catch (error: any) {
     console.error('Error creating product in DB, returning fallback response:', error.message);
     // Find matching brand and category objects for UI display
@@ -428,7 +431,8 @@ router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res)
     product.specifications = specifications || product.specifications;
 
     const updated = await product.save();
-    res.json(updated);
+    const populated = await Product.findById(updated._id).populate('brand').populate('category');
+    res.json(populated || updated);
   } catch (error: any) {
     console.error('Error updating product in DB, returning updated payload:', error.message);
     res.json({ _id: req.params.id, ...req.body });
