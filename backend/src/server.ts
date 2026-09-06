@@ -17,16 +17,30 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB on incoming request
-app.use(async (req, res, next) => {
-  await connectDB();
-  next();
-});
-
-// Middleware
+// Core Middleware
 app.use(cors({ origin: '*' })); // Enable CORS for Next.js / Vite client
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Connect to MongoDB on incoming request (with health check bypass)
+app.use(async (req, res, next) => {
+  // Allow health check without blocking on DB
+  if (req.path === '/' || req.path === '/api') {
+    return next();
+  }
+
+  try {
+    await connectDB();
+    next();
+  } catch (error: any) {
+    console.error('Database connection failed:', error.message);
+    res.status(503).json({
+      message: 'Database connection failed. Please ensure MongoDB Atlas Network Access whitelist has 0.0.0.0/0 (Allow access from anywhere).',
+      error: error.message,
+    });
+  }
+});
+
 
 // Serve uploaded static images
 const publicDir = path.join(__dirname, '../public');

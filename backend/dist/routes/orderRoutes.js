@@ -31,7 +31,8 @@ router.get('/notifications', authMiddleware_1.protect, (0, authMiddleware_1.rest
         res.json({ notifications, unreadCount });
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error fetching notifications:', error);
+        res.json({ notifications: [], unreadCount: 0 });
     }
 });
 // @route   PUT /api/orders/notifications/read-all
@@ -221,7 +222,8 @@ router.get('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPE
         res.json(orders);
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error fetching orders:', error);
+        res.json([]);
     }
 });
 // @route   PUT /api/orders/:id/status

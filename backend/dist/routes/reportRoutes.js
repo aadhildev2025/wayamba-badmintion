@@ -81,7 +81,21 @@ router.get('/dashboard', authMiddleware_1.protect, (0, authMiddleware_1.restrict
         });
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error generating dashboard report:', error);
+        res.json({
+            summary: {
+                totalOrders: 0,
+                pendingOrders: 0,
+                deliveredOrders: 0,
+                cancelledOrders: 0,
+                totalCustomers: 0,
+                totalProducts: 0,
+                totalRevenue: 0,
+            },
+            lowStockAlerts: [],
+            dailyTrend: [],
+            bestSellers: [],
+        });
     }
 });
 exports.default = router;

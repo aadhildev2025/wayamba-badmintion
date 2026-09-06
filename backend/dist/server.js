@@ -19,15 +19,28 @@ dotenv_1.default.config();
 // Create Express app
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
-// Connect to MongoDB on incoming request
-app.use(async (req, res, next) => {
-    await (0, db_1.connectDB)();
-    next();
-});
-// Middleware
+// Core Middleware
 app.use((0, cors_1.default)({ origin: '*' })); // Enable CORS for Next.js / Vite client
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
+// Connect to MongoDB on incoming request (with health check bypass)
+app.use(async (req, res, next) => {
+    // Allow health check without blocking on DB
+    if (req.path === '/' || req.path === '/api') {
+        return next();
+    }
+    try {
+        await (0, db_1.connectDB)();
+        next();
+    }
+    catch (error) {
+        console.error('Database connection failed:', error.message);
+        res.status(503).json({
+            message: 'Database connection failed. Please ensure MongoDB Atlas Network Access whitelist has 0.0.0.0/0 (Allow access from anywhere).',
+            error: error.message,
+        });
+    }
+});
 // Serve uploaded static images
 const publicDir = path_1.default.join(__dirname, '../public');
 if (!fs_1.default.existsSync(path_1.default.join(publicDir, 'uploads'))) {
