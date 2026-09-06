@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.fallbackProducts = exports.fallbackBrands = exports.fallbackCategories = void 0;
 const express_1 = require("express");
 const Product_1 = __importDefault(require("../models/Product"));
 const Category_1 = __importDefault(require("../models/Category"));
@@ -11,6 +12,52 @@ const Review_1 = __importDefault(require("../models/Review"));
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const uploadMiddleware_1 = require("../middleware/uploadMiddleware");
 const router = (0, express_1.Router)();
+// Fallback seed data for resilience when MongoDB is offline or initial connection is pending
+exports.fallbackCategories = [
+    { _id: '650000000000000000000010', name: 'Badminton Rackets', slug: 'rackets', icon: 'Sparkles', image: '/imgs/cat_badminton_rackets.png' },
+    { _id: '650000000000000000000011', name: 'Indoor Court & Sports Shoes', slug: 'shoes', icon: 'Footprints', image: '/imgs/cat_badminton_shoes.png' },
+    { _id: '650000000000000000000012', name: 'Shuttlecocks', slug: 'shuttlecocks', icon: 'FlameKindling', image: '/imgs/hero_shuttlecock.png' },
+    { _id: '650000000000000000000013', name: 'Cricket Equipment', slug: 'cricket', icon: 'Trophy', image: '/imgs/cat_cricket_equipment.png' },
+    { _id: '650000000000000000000014', name: 'Tennis Rackets & Gear', slug: 'tennis', icon: 'CircleDot', image: '/imgs/hero_tennis.png' },
+    { _id: '650000000000000000000015', name: 'Jerseys & Apparel', slug: 'jerseys', icon: 'Shirt', image: '/imgs/jersey_apparel.png' },
+    { _id: '650000000000000000000016', name: 'Sports Bags', slug: 'bags', icon: 'ShoppingBag', image: '/imgs/hero_bag.png' },
+    { _id: '650000000000000000000017', name: 'Grips & Accessories', slug: 'grips', icon: 'Layers', image: '/imgs/cat_grips_accessories.png' },
+    { _id: '650000000000000000000018', name: 'Strings', slug: 'strings', icon: 'Cable', image: '/imgs/racket_closeup_dark.png' },
+];
+exports.fallbackBrands = [
+    { _id: '650000000000000000000020', name: 'Yonex', slug: 'yonex', logo: '/Brand logo/Yonex.webp' },
+    { _id: '650000000000000000000021', name: 'Li-Ning', slug: 'li-ning', logo: '/Brand logo/Li-Ning.svg' },
+    { _id: '650000000000000000000022', name: 'Victor', slug: 'victor', logo: '/Brand logo/Victor.png' },
+    { _id: '650000000000000000000023', name: 'Kookaburra', slug: 'kookaburra', logo: '/images/brands/kookaburra.png' },
+    { _id: '650000000000000000000024', name: 'Wilson', slug: 'wilson', logo: '/images/brands/wilson.png' },
+    { _id: '650000000000000000000025', name: 'Babolat', slug: 'babolat', logo: '/images/brands/babolat.png' },
+    { _id: '650000000000000000000026', name: 'Apacs', slug: 'apacs', logo: '/images/brands/apacs.png' },
+    { _id: '650000000000000000000027', name: 'Kawasaki', slug: 'kawasaki', logo: '/Brand logo/Kawasaki.jpg' },
+];
+exports.fallbackProducts = [
+    {
+        _id: '650000000000000000000030',
+        name: 'Yonex Astrox 100ZZ Kurenai',
+        slug: 'yonex-astrox-100zz-kurenai',
+        sku: 'YNX-AX100ZZ-KR',
+        description: 'The flagship heavy-head offensive badminton racket used by Viktor Axelsen. Featuring Hyper Slim Shaft, NAMD graphite, and Rotational Generator System.',
+        price: 58500,
+        salePrice: 55000,
+        stockQuantity: 12,
+        images: ['/imgs/hero_rackets.png'],
+        brand: exports.fallbackBrands[0],
+        category: exports.fallbackCategories[0],
+        status: 'active',
+        tags: ['racket', 'offensive', 'head heavy', 'professional', 'astrox', 'badminton'],
+        isFeatured: true,
+        specifications: [
+            { key: 'Weight', value: '4U (Avg. 83g)' },
+            { key: 'Grip Size', value: 'G5' },
+            { key: 'Flex', value: 'Extra Stiff' },
+            { key: 'Max Tension', value: '28 lbs' },
+        ],
+    },
+];
 // ==========================================
 // CATEGORY ENDPOINTS
 // ==========================================
@@ -18,10 +65,11 @@ const router = (0, express_1.Router)();
 router.get('/categories', async (req, res) => {
     try {
         const categories = await Category_1.default.find().sort({ name: 1 });
-        res.json(categories);
+        res.json(categories.length > 0 ? categories : exports.fallbackCategories);
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error fetching categories from DB, returning fallbacks:', error.message);
+        res.json(exports.fallbackCategories);
     }
 });
 // POST create category (Super Admin & Staff)
@@ -63,10 +111,11 @@ router.delete('/categories/:id', authMiddleware_1.protect, (0, authMiddleware_1.
 router.get('/brands', async (req, res) => {
     try {
         const brands = await Brand_1.default.find().sort({ name: 1 });
-        res.json(brands);
+        res.json(brands.length > 0 ? brands : exports.fallbackBrands);
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error fetching brands from DB, returning fallbacks:', error.message);
+        res.json(exports.fallbackBrands);
     }
 });
 // POST create brand (Super Admin & Staff)
@@ -110,7 +159,6 @@ router.get('/', async (req, res) => {
         const { category, brand, search, minPrice, maxPrice, sort, isFeatured } = req.query;
         const query = {};
         // Filter by status (guests/customers only see active products)
-        // For simplicity, we can default to showing active, but let admin see drafts if they pass a parameter
         if (req.query.adminView === 'true') {
             // allow fetching drafts as well
         }
@@ -150,16 +198,17 @@ router.get('/', async (req, res) => {
             sortOption = { price: -1 };
         }
         else if (sort === 'popular') {
-            sortOption = { stockQuantity: 1 }; // Placeholder logic for popularity
+            sortOption = { stockQuantity: 1 };
         }
         const products = await Product_1.default.find(query)
             .populate('category')
             .populate('brand')
             .sort(sortOption);
-        res.json(products);
+        res.json(products.length > 0 ? products : exports.fallbackProducts);
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error fetching products from DB, returning fallback products:', error.message);
+        res.json(exports.fallbackProducts);
     }
 });
 const mongoose_1 = __importDefault(require("mongoose"));

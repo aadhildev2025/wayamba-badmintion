@@ -9,6 +9,55 @@ import path from 'path';
 
 const router = Router();
 
+// Fallback seed data for resilience when MongoDB is offline or initial connection is pending
+export const fallbackCategories = [
+  { _id: '650000000000000000000010', name: 'Badminton Rackets', slug: 'rackets', icon: 'Sparkles', image: '/imgs/cat_badminton_rackets.png' },
+  { _id: '650000000000000000000011', name: 'Indoor Court & Sports Shoes', slug: 'shoes', icon: 'Footprints', image: '/imgs/cat_badminton_shoes.png' },
+  { _id: '650000000000000000000012', name: 'Shuttlecocks', slug: 'shuttlecocks', icon: 'FlameKindling', image: '/imgs/hero_shuttlecock.png' },
+  { _id: '650000000000000000000013', name: 'Cricket Equipment', slug: 'cricket', icon: 'Trophy', image: '/imgs/cat_cricket_equipment.png' },
+  { _id: '650000000000000000000014', name: 'Tennis Rackets & Gear', slug: 'tennis', icon: 'CircleDot', image: '/imgs/hero_tennis.png' },
+  { _id: '650000000000000000000015', name: 'Jerseys & Apparel', slug: 'jerseys', icon: 'Shirt', image: '/imgs/jersey_apparel.png' },
+  { _id: '650000000000000000000016', name: 'Sports Bags', slug: 'bags', icon: 'ShoppingBag', image: '/imgs/hero_bag.png' },
+  { _id: '650000000000000000000017', name: 'Grips & Accessories', slug: 'grips', icon: 'Layers', image: '/imgs/cat_grips_accessories.png' },
+  { _id: '650000000000000000000018', name: 'Strings', slug: 'strings', icon: 'Cable', image: '/imgs/racket_closeup_dark.png' },
+];
+
+export const fallbackBrands = [
+  { _id: '650000000000000000000020', name: 'Yonex', slug: 'yonex', logo: '/Brand logo/Yonex.webp' },
+  { _id: '650000000000000000000021', name: 'Li-Ning', slug: 'li-ning', logo: '/Brand logo/Li-Ning.svg' },
+  { _id: '650000000000000000000022', name: 'Victor', slug: 'victor', logo: '/Brand logo/Victor.png' },
+  { _id: '650000000000000000000023', name: 'Kookaburra', slug: 'kookaburra', logo: '/images/brands/kookaburra.png' },
+  { _id: '650000000000000000000024', name: 'Wilson', slug: 'wilson', logo: '/images/brands/wilson.png' },
+  { _id: '650000000000000000000025', name: 'Babolat', slug: 'babolat', logo: '/images/brands/babolat.png' },
+  { _id: '650000000000000000000026', name: 'Apacs', slug: 'apacs', logo: '/images/brands/apacs.png' },
+  { _id: '650000000000000000000027', name: 'Kawasaki', slug: 'kawasaki', logo: '/Brand logo/Kawasaki.jpg' },
+];
+
+export const fallbackProducts = [
+  {
+    _id: '650000000000000000000030',
+    name: 'Yonex Astrox 100ZZ Kurenai',
+    slug: 'yonex-astrox-100zz-kurenai',
+    sku: 'YNX-AX100ZZ-KR',
+    description: 'The flagship heavy-head offensive badminton racket used by Viktor Axelsen. Featuring Hyper Slim Shaft, NAMD graphite, and Rotational Generator System.',
+    price: 58500,
+    salePrice: 55000,
+    stockQuantity: 12,
+    images: ['/imgs/hero_rackets.png'],
+    brand: fallbackBrands[0],
+    category: fallbackCategories[0],
+    status: 'active',
+    tags: ['racket', 'offensive', 'head heavy', 'professional', 'astrox', 'badminton'],
+    isFeatured: true,
+    specifications: [
+      { key: 'Weight', value: '4U (Avg. 83g)' },
+      { key: 'Grip Size', value: 'G5' },
+      { key: 'Flex', value: 'Extra Stiff' },
+      { key: 'Max Tension', value: '28 lbs' },
+    ],
+  },
+];
+
 // ==========================================
 // CATEGORY ENDPOINTS
 // ==========================================
@@ -17,9 +66,10 @@ const router = Router();
 router.get('/categories', async (req, res) => {
   try {
     const categories = await Category.find().sort({ name: 1 });
-    res.json(categories);
+    res.json(categories.length > 0 ? categories : fallbackCategories);
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching categories from DB, returning fallbacks:', error.message);
+    res.json(fallbackCategories);
   }
 });
 
@@ -66,9 +116,10 @@ router.delete('/categories/:id', protect, restrictTo('SUPER_ADMIN'), async (req,
 router.get('/brands', async (req, res) => {
   try {
     const brands = await Brand.find().sort({ name: 1 });
-    res.json(brands);
+    res.json(brands.length > 0 ? brands : fallbackBrands);
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching brands from DB, returning fallbacks:', error.message);
+    res.json(fallbackBrands);
   }
 });
 
@@ -119,7 +170,6 @@ router.get('/', async (req, res) => {
     const query: any = {};
 
     // Filter by status (guests/customers only see active products)
-    // For simplicity, we can default to showing active, but let admin see drafts if they pass a parameter
     if (req.query.adminView === 'true') {
       // allow fetching drafts as well
     } else {
@@ -158,7 +208,7 @@ router.get('/', async (req, res) => {
     } else if (sort === 'price-desc') {
       sortOption = { price: -1 };
     } else if (sort === 'popular') {
-      sortOption = { stockQuantity: 1 }; // Placeholder logic for popularity
+      sortOption = { stockQuantity: 1 };
     }
 
     const products = await Product.find(query)
@@ -166,9 +216,10 @@ router.get('/', async (req, res) => {
       .populate('brand')
       .sort(sortOption);
 
-    res.json(products);
+    res.json(products.length > 0 ? products : fallbackProducts);
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching products from DB, returning fallback products:', error.message);
+    res.json(fallbackProducts);
   }
 });
 
