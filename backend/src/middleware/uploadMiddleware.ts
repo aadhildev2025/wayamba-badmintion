@@ -1,6 +1,50 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import dotenv from 'dotenv';
+import { v2 as cloudinary } from 'cloudinary';
+
+dotenv.config();
+
+export const isCloudinaryReady = (): boolean => {
+  return Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  );
+};
+
+export const configureCloudinary = () => {
+  if (isCloudinaryReady()) {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME?.trim(),
+      api_key: process.env.CLOUDINARY_API_KEY?.trim(),
+      api_secret: process.env.CLOUDINARY_API_SECRET?.trim(),
+    });
+  }
+};
+
+configureCloudinary();
+
+export const uploadToCloudinary = (fileBuffer: Buffer, folder = 'wayamba_products'): Promise<string> => {
+  configureCloudinary();
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: 'image',
+      },
+      (error, result) => {
+        if (error || !result) {
+          return reject(error || new Error('Upload to Cloudinary failed'));
+        }
+        resolve(result.secure_url);
+      }
+    );
+    uploadStream.end(fileBuffer);
+  });
+};
+
 
 const isVercel = process.env.VERCEL === '1';
 
@@ -14,7 +58,8 @@ try {
   // Read-only filesystem in serverless environments
 }
 
-const storage = isVercel
+// When Cloudinary is active or in Vercel, use memory storage for buffer access
+const storage = (isCloudinaryReady() || isVercel)
   ? multer.memoryStorage()
   : multer.diskStorage({
       destination: (req, file, cb) => {
@@ -41,7 +86,10 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
 
 export const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter,
 });
+
+export { cloudinary };
+
 

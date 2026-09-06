@@ -4,7 +4,7 @@ import Category from '../models/Category';
 import Brand from '../models/Brand';
 import Review from '../models/Review';
 import { protect, optionalAuth, restrictTo, AuthRequest } from '../middleware/authMiddleware';
-import { upload } from '../middleware/uploadMiddleware';
+import { upload, uploadToCloudinary, isCloudinaryReady } from '../middleware/uploadMiddleware';
 import path from 'path';
 
 const router = Router();
@@ -312,7 +312,7 @@ router.get('/:idOrSlug/reviews', async (req, res) => {
 
 // POST upload multiple images
 router.post('/upload', protect, restrictTo('SUPER_ADMIN', 'STAFF'), (req, res) => {
-  upload.array('images', 10)(req, res, (err: any) => {
+  upload.array('images', 10)(req, res, async (err: any) => {
     if (err) {
       return res.status(400).json({ message: err.message || 'Image upload failed' });
     }
@@ -320,14 +320,24 @@ router.post('/upload', protect, restrictTo('SUPER_ADMIN', 'STAFF'), (req, res) =
       return res.status(400).json({ message: 'No image files provided' });
     }
     const files = req.files as Express.Multer.File[];
-    const filePaths = files.map(file => {
-      if (file.buffer) {
-        const mime = file.mimetype || 'image/jpeg';
-        return `data:${mime};base64,${file.buffer.toString('base64')}`;
-      }
-      return `/uploads/${file.filename}`;
-    });
-    return res.json({ urls: filePaths, imageUrls: filePaths });
+    try {
+      const fileUrls = await Promise.all(
+        files.map(async (file) => {
+          if (isCloudinaryReady() && file.buffer) {
+            return await uploadToCloudinary(file.buffer);
+          }
+          if (file.buffer) {
+            const mime = file.mimetype || 'image/jpeg';
+            return `data:${mime};base64,${file.buffer.toString('base64')}`;
+          }
+          return `/uploads/${file.filename}`;
+        })
+      );
+      return res.json({ urls: fileUrls, imageUrls: fileUrls });
+    } catch (uploadError: any) {
+      console.error('Cloudinary / Image upload error:', uploadError);
+      return res.status(500).json({ message: uploadError.message || 'Image upload failed' });
+    }
   });
 });
 

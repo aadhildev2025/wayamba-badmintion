@@ -292,7 +292,7 @@ router.get('/:idOrSlug/reviews', async (req, res) => {
 });
 // POST upload multiple images
 router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (req, res) => {
-    uploadMiddleware_1.upload.array('images', 10)(req, res, (err) => {
+    uploadMiddleware_1.upload.array('images', 10)(req, res, async (err) => {
         if (err) {
             return res.status(400).json({ message: err.message || 'Image upload failed' });
         }
@@ -300,14 +300,23 @@ router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo
             return res.status(400).json({ message: 'No image files provided' });
         }
         const files = req.files;
-        const filePaths = files.map(file => {
-            if (file.buffer) {
-                const mime = file.mimetype || 'image/jpeg';
-                return `data:${mime};base64,${file.buffer.toString('base64')}`;
-            }
-            return `/uploads/${file.filename}`;
-        });
-        return res.json({ urls: filePaths, imageUrls: filePaths });
+        try {
+            const fileUrls = await Promise.all(files.map(async (file) => {
+                if ((0, uploadMiddleware_1.isCloudinaryReady)() && file.buffer) {
+                    return await (0, uploadMiddleware_1.uploadToCloudinary)(file.buffer);
+                }
+                if (file.buffer) {
+                    const mime = file.mimetype || 'image/jpeg';
+                    return `data:${mime};base64,${file.buffer.toString('base64')}`;
+                }
+                return `/uploads/${file.filename}`;
+            }));
+            return res.json({ urls: fileUrls, imageUrls: fileUrls });
+        }
+        catch (uploadError) {
+            console.error('Cloudinary / Image upload error:', uploadError);
+            return res.status(500).json({ message: uploadError.message || 'Image upload failed' });
+        }
     });
 });
 // POST create product (Super Admin & Staff)
