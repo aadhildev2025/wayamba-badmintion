@@ -11,6 +11,9 @@ const Brand_1 = __importDefault(require("../models/Brand"));
 const Review_1 = __importDefault(require("../models/Review"));
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const uploadMiddleware_1 = require("../middleware/uploadMiddleware");
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
+const mongoose_1 = __importDefault(require("mongoose"));
 const router = (0, express_1.Router)();
 // Fallback seed data for resilience when MongoDB is offline or initial connection is pending
 exports.fallbackCategories = [
@@ -122,17 +125,45 @@ router.get('/brands', async (req, res) => {
 router.post('/brands', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
     try {
         const { name, logo } = req.body;
-        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-        const exists = await Brand_1.default.findOne({ slug });
-        if (exists) {
-            res.status(400).json({ message: 'Brand already exists' });
-            return;
+        if (!name || !name.trim()) {
+            return res.status(400).json({ message: 'Brand name is required' });
         }
-        const brand = await Brand_1.default.create({ name, slug, logo });
+        const cleanName = name.trim();
+        const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        // Check if brand already exists (case-insensitive name or slug)
+        let brand = await Brand_1.default.findOne({
+            $or: [
+                { slug },
+                { name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+            ]
+        });
+        if (brand) {
+            return res.status(200).json(brand);
+        }
+        brand = await Brand_1.default.create({ name: cleanName, slug, logo: logo || '' });
+        // Also keep fallback array in sync
+        if (!exports.fallbackBrands.some(b => b.slug === slug || b._id === String(brand?._id))) {
+            exports.fallbackBrands.push({
+                _id: String(brand._id),
+                name: brand.name,
+                slug: brand.slug,
+                logo: brand.logo || ''
+            });
+        }
         res.status(201).json(brand);
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error creating brand in DB, returning fallback:', error.message);
+        const cleanName = (req.body.name || 'Custom Brand').trim();
+        const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        const fallbackBrand = {
+            _id: '65' + Math.random().toString(16).slice(2, 26).padEnd(22, '0'),
+            name: cleanName,
+            slug,
+            logo: req.body.logo || ''
+        };
+        exports.fallbackBrands.push(fallbackBrand);
+        res.status(201).json(fallbackBrand);
     }
 });
 // DELETE brand (Super Admin only)
@@ -211,7 +242,6 @@ router.get('/', async (req, res) => {
         res.json(exports.fallbackProducts);
     }
 });
-const mongoose_1 = __importDefault(require("mongoose"));
 // GET single product by slug
 router.get('/slug/:slug', async (req, res) => {
     try {
@@ -294,6 +324,7 @@ router.get('/:idOrSlug/reviews', async (req, res) => {
 router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (req, res) => {
     uploadMiddleware_1.upload.array('images', 10)(req, res, async (err) => {
         if (err) {
+            console.error('Multer upload error:', err);
             return res.status(400).json({ message: err.message || 'Image upload failed' });
         }
         if (!req.files || req.files.length === 0) {
@@ -301,24 +332,77 @@ router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo
         }
         const files = req.files;
         try {
+            const publicUploadsDir = path_1.default.join(__dirname, '../../public/uploads');
+            try {
+                if (!fs_1.default.existsSync(publicUploadsDir)) {
+                    fs_1.default.mkdirSync(publicUploadsDir, { recursive: true });
+                }
+            }
+            catch (dirErr) {
+                console.warn('Upload directory check:', dirErr);
+            }
             const fileUrls = await Promise.all(files.map(async (file) => {
+                // 1. Try Cloudinary first if configured
                 if ((0, uploadMiddleware_1.isCloudinaryReady)() && file.buffer) {
-                    return await (0, uploadMiddleware_1.uploadToCloudinary)(file.buffer);
+                    try {
+                        const cloudUrl = await (0, uploadMiddleware_1.uploadToCloudinary)(file.buffer);
+                        if (cloudUrl)
+                            return cloudUrl;
+                    }
+                    catch (cloudErr) {
+                        console.warn('Cloudinary upload error, falling back to local/data URL storage:', cloudErr.message || cloudErr);
+                    }
                 }
+                // 2. Fallback to saving to local public/uploads directory
                 if (file.buffer) {
-                    const mime = file.mimetype || 'image/jpeg';
-                    return `data:${mime};base64,${file.buffer.toString('base64')}`;
+                    try {
+                        const originalExt = path_1.default.extname(file.originalname) || '.webp';
+                        const cleanExt = originalExt.startsWith('.') ? originalExt : `.${originalExt}`;
+                        const filename = `img-${Date.now()}-${Math.round(Math.random() * 1e9)}${cleanExt}`;
+                        const filePath = path_1.default.join(publicUploadsDir, filename);
+                        fs_1.default.writeFileSync(filePath, file.buffer);
+                        const host = req.get('host') || 'localhost:5000';
+                        const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+                        return `${protocol}://${host}/uploads/${filename}`;
+                    }
+                    catch (diskErr) {
+                        console.warn('Local disk write failed, fallback to base64 Data URL:', diskErr.message);
+                        // 3. Fallback to base64 data URL
+                        const mime = file.mimetype || 'image/webp';
+                        return `data:${mime};base64,${file.buffer.toString('base64')}`;
+                    }
                 }
-                return `/uploads/${file.filename}`;
+                // If file was stored by disk storage
+                const host = req.get('host') || 'localhost:5000';
+                const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+                return `${protocol}://${host}/uploads/${file.filename}`;
             }));
             return res.json({ urls: fileUrls, imageUrls: fileUrls });
         }
         catch (uploadError) {
-            console.error('Cloudinary / Image upload error:', uploadError);
+            console.error('Image upload handler error:', uploadError);
             return res.status(500).json({ message: uploadError.message || 'Image upload failed' });
         }
     });
 });
+// Helper to resolve brand (by ObjectId or name)
+async function resolveBrand(brandInput) {
+    if (brandInput && mongoose_1.default.Types.ObjectId.isValid(brandInput)) {
+        const existing = await Brand_1.default.findById(brandInput);
+        if (existing)
+            return existing._id;
+    }
+    // Try by name or slug
+    const cleanName = String(brandInput || exports.fallbackBrands[0]?.name || 'Yonex').trim();
+    const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    let brandDoc = await Brand_1.default.findOne({
+        $or: [{ slug }, { name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }]
+    });
+    if (!brandDoc) {
+        brandDoc = await Brand_1.default.create({ name: cleanName, slug, logo: '' });
+    }
+    return brandDoc._id;
+}
 // POST create product (Super Admin & Staff)
 router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
     const { name, sku, description, price, salePrice, stockQuantity, images, brand, category, status, tags, isFeatured, specifications } = req.body;
@@ -329,6 +413,7 @@ router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUP
             res.status(400).json({ message: 'Product with this SKU or Name already exists' });
             return;
         }
+        const resolvedBrandId = await resolveBrand(brand);
         const product = await Product_1.default.create({
             name,
             slug,
@@ -338,19 +423,20 @@ router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUP
             salePrice,
             stockQuantity,
             images,
-            brand,
+            brand: resolvedBrandId,
             category,
             status,
             tags,
             isFeatured,
             specifications
         });
-        res.status(201).json(product);
+        const populated = await Product_1.default.findById(product._id).populate('brand').populate('category');
+        res.status(201).json(populated || product);
     }
     catch (error) {
         console.error('Error creating product in DB, returning fallback response:', error.message);
         // Find matching brand and category objects for UI display
-        const matchedBrand = exports.fallbackBrands.find(b => b._id === brand) || { _id: brand, name: 'Yonex' };
+        const matchedBrand = exports.fallbackBrands.find(b => b._id === brand || b.name.toLowerCase() === String(brand).toLowerCase()) || { _id: brand, name: typeof brand === 'string' && brand ? brand : 'Yonex' };
         const matchedCategory = exports.fallbackCategories.find(c => c._id === category) || { _id: category, name: 'Badminton Rackets' };
         const simulatedProduct = {
             _id: '65' + Math.random().toString(16).slice(2, 26).padEnd(22, '0'),
@@ -391,14 +477,17 @@ router.put('/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('S
         product.salePrice = salePrice !== undefined ? salePrice : product.salePrice;
         product.stockQuantity = stockQuantity !== undefined ? stockQuantity : product.stockQuantity;
         product.images = images || product.images;
-        product.brand = brand || product.brand;
+        if (brand) {
+            product.brand = await resolveBrand(brand);
+        }
         product.category = category || product.category;
         product.status = status || product.status;
         product.tags = tags || product.tags;
         product.isFeatured = isFeatured !== undefined ? isFeatured : product.isFeatured;
         product.specifications = specifications || product.specifications;
         const updated = await product.save();
-        res.json(updated);
+        const populated = await Product_1.default.findById(updated._id).populate('brand').populate('category');
+        res.json(populated || updated);
     }
     catch (error) {
         console.error('Error updating product in DB, returning updated payload:', error.message);

@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit2, Trash2, X, AlertTriangle, RefreshCw, UploadCloud, ImageIcon } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, AlertTriangle, RefreshCw, UploadCloud, ImageIcon, Check, Star } from 'lucide-react';
 import api from '@/lib/api';
-
 
 interface Brand {
   _id: string;
@@ -50,6 +49,7 @@ export default function AdminProducts() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Form inputs
   const [name, setName] = useState('');
@@ -66,67 +66,26 @@ export default function AdminProducts() {
   const [isFeatured, setIsFeatured] = useState(false);
   const [specList, setSpecList] = useState<Specification[]>([]);
 
+  // Custom Brand Modal State
+  const [brandModalOpen, setBrandModalOpen] = useState(false);
+  const [customBrandName, setCustomBrandName] = useState('');
+  const [addingBrandLoading, setAddingBrandLoading] = useState(false);
+
   // Spec form state
   const [specKey, setSpecKey] = useState('');
   const [specVal, setSpecVal] = useState('');
 
-  // Fast client-side image compressor before uploading to server/Cloudinary
-  const compressImageFile = async (file: File, maxDimension = 1400, quality = 0.85): Promise<File> => {
-    if (!file.type.startsWith('image/') || file.size < 200 * 1024) {
-      return file; // If already tiny or non-image, skip compression
-    }
-    return new Promise((resolve) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        let { width, height } = img;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(file);
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) return resolve(file);
-            const compressed = new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.webp', {
-              type: 'image/webp',
-              lastModified: Date.now(),
-            });
-            resolve(compressed);
-          },
-          'image/webp',
-          quality
-        );
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve(file);
-      };
-      img.src = url;
-    });
-  };
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  // Instant parallel image uploader
+  const uploadFiles = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return;
 
     setUploadingImage(true);
     try {
       const formData = new FormData();
       for (let i = 0; i < files.length; i++) {
-        const compressed = await compressImageFile(files[i]);
-        formData.append('images', compressed);
+        formData.append('images', files[i]);
       }
 
       const res = await api.post('/products/upload', formData, {
@@ -138,15 +97,27 @@ export default function AdminProducts() {
         const combined = Array.from(new Set([...currentList, ...uploadedUrls]));
         setImageInput(combined.join(', '));
       } else {
-        alert('No image URLs returned from server.');
+        alert('Server did not return uploaded image URLs. Please try again.');
       }
     } catch (err: any) {
       console.error('Image upload error:', err);
-      alert(err.response?.data?.message || 'Failed to upload images');
+      alert(err.response?.data?.message || 'Failed to upload images. Please check file format or try again.');
     } finally {
       setUploadingImage(false);
-      e.target.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      uploadFiles(e.target.files);
+    }
+  };
+
+  const handleSetMainImage = (urlToSet: string) => {
+    const currentList = imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const reordered = [urlToSet, ...currentList.filter(u => u !== urlToSet)];
+    setImageInput(reordered.join(', '));
   };
 
   const handleRemoveImage = (urlToRemove: string) => {
@@ -155,6 +126,39 @@ export default function AdminProducts() {
     setImageInput(filtered.join(', '));
   };
 
+  // Custom Brand Creator
+  const handleSaveCustomBrand = async () => {
+    const trimmed = customBrandName.trim();
+    if (!trimmed) {
+      alert('Please enter a valid brand name.');
+      return;
+    }
+
+    setAddingBrandLoading(true);
+    try {
+      const res = await api.post('/products/brands', { name: trimmed });
+      const newBrand = res.data;
+      if (newBrand && newBrand._id) {
+        setBrands(prev => {
+          if (prev.some(b => b._id === newBrand._id || b.name.toLowerCase() === trimmed.toLowerCase())) {
+            return prev;
+          }
+          return [...prev, newBrand];
+        });
+        setBrandId(newBrand._id);
+      }
+    } catch (err: any) {
+      console.error('Brand creation API fallback:', err);
+      const fallbackId = 'brand_' + Date.now();
+      const fallbackObj = { _id: fallbackId, name: trimmed };
+      setBrands(prev => [...prev, fallbackObj]);
+      setBrandId(fallbackId);
+    } finally {
+      setAddingBrandLoading(false);
+      setBrandModalOpen(false);
+      setCustomBrandName('');
+    }
+  };
 
   const fetchLists = () => {
     setLoading(true);
@@ -183,6 +187,8 @@ export default function AdminProducts() {
   const openForm = (prod: Product | null = null) => {
     setSelectedProduct(prod);
     setModalOpen(true);
+    setBrandModalOpen(false);
+    setCustomBrandName('');
     
     if (prod) {
       setName(prod.name);
@@ -233,7 +239,17 @@ export default function AdminProducts() {
     const salePriceVal = salePrice ? Number(salePrice) : undefined;
     const finalPrice = priceVal > 0 ? priceVal : (salePriceVal && salePriceVal > 0 ? salePriceVal : 0);
 
-    if (!name || !sku || !brandId || !categoryId || finalPrice <= 0) {
+    let resolvedBrand = brandId;
+    if (brandId === '__new_custom__' && customBrandName.trim()) {
+      try {
+        const brandRes = await api.post('/products/brands', { name: customBrandName.trim() });
+        resolvedBrand = brandRes.data._id || brandRes.data.name || customBrandName.trim();
+      } catch {
+        resolvedBrand = customBrandName.trim();
+      }
+    }
+
+    if (!name || !sku || !resolvedBrand || resolvedBrand === '__new_custom__' || !categoryId || finalPrice <= 0) {
       alert('Name, SKU, Brand, Category, and a valid Regular Price (> 0) are required.');
       return;
     }
@@ -248,7 +264,7 @@ export default function AdminProducts() {
       salePrice: salePriceVal,
       stockQuantity: Number(stockQuantity),
       images: imageInput.split(',').map(s => s.trim()).filter(Boolean),
-      brand: brandId,
+      brand: resolvedBrand,
       category: categoryId,
       status,
       tags: tagsInput.split(',').map(s => s.trim()).filter(Boolean),
@@ -626,17 +642,48 @@ export default function AdminProducts() {
                 {/* Section 3: Brand, Category, Status, Featured */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>Brand</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5 }}>Brand</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrandModalOpen(true);
+                          setCustomBrandName('');
+                        }}
+                        style={{
+                          background: 'rgba(176,28,40,0.12)', border: '1px solid rgba(176,28,40,0.3)', color: 'var(--red-vivid)',
+                          fontSize: 11, fontWeight: 800, fontFamily: 'Outfit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3,
+                          padding: '2px 8px', borderRadius: 6, transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Plus size={12} /> Custom Brand
+                      </button>
+                    </div>
+
                     <select
                       value={brandId}
-                      onChange={e => setBrandId(e.target.value)}
+                      onChange={e => {
+                        if (e.target.value === '__new_custom__') {
+                          setBrandModalOpen(true);
+                          setCustomBrandName('');
+                        } else {
+                          setBrandId(e.target.value);
+                        }
+                      }}
                       style={{
                         width: '100%', padding: '12px 16px', background: '#161622',
                         border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 14,
                         color: '#FFFFFF', fontSize: 14, fontFamily: 'Outfit', fontWeight: 600, outline: 'none'
                       }}
                     >
-                      {brands.map(b => <option key={b._id} value={b._id} style={{ background: '#161622', color: '#fff' }}>{b.name}</option>)}
+                      {brands.map(b => (
+                        <option key={b._id} value={b._id} style={{ background: '#161622', color: '#fff' }}>
+                          {b.name}
+                        </option>
+                      ))}
+                      <option value="__new_custom__" style={{ background: '#1B1B28', color: 'var(--red-vivid)', fontWeight: 'bold' }}>
+                        + Add Custom Brand...
+                      </option>
                     </select>
                   </div>
                   <div>
@@ -689,7 +736,7 @@ export default function AdminProducts() {
                       <label style={{ fontSize: 13, fontWeight: 800, color: '#FFFFFF', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: 6 }}>
                         <ImageIcon size={16} style={{ color: 'var(--red-vivid)' }} /> Product Media & Image Gallery
                       </label>
-                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter' }}>Upload photos from computer or select equipment presets.</span>
+                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter' }}>Upload photos from computer or drag & drop files.</span>
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(176,28,40,0.18)', color: 'var(--red-vivid)', padding: '4px 12px', borderRadius: 99, border: '1px solid rgba(176,28,40,0.3)', fontFamily: 'Outfit' }}>
                       {imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean).length : 0} Images Attached
@@ -697,51 +744,127 @@ export default function AdminProducts() {
                   </div>
 
                   {/* Drag & Drop Upload Zone */}
-                  <label style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '24px 16px', border: '2px dashed rgba(176,28,40,0.4)', borderRadius: 14,
-                    background: 'rgba(176,28,40,0.04)', cursor: 'pointer', transition: 'all 0.2s ease',
-                    marginBottom: 16, textAlign: 'center',
-                  }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(176,28,40,0.08)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'rgba(176,28,40,0.04)')}
+                  <div
+                    onDragOver={e => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={e => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                    }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        uploadFiles(e.dataTransfer.files);
+                      }
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      padding: '28px 16px',
+                      border: isDragging ? '2px dashed #EF4444' : '2px dashed rgba(176,28,40,0.45)',
+                      borderRadius: 14,
+                      background: isDragging ? 'rgba(176,28,40,0.15)' : 'rgba(176,28,40,0.04)',
+                      cursor: 'pointer', transition: 'all 0.2s ease',
+                      marginBottom: 16, textAlign: 'center',
+                    }}
+                    onMouseEnter={e => {
+                      if (!isDragging) (e.currentTarget as HTMLElement).style.background = 'rgba(176,28,40,0.08)';
+                    }}
+                    onMouseLeave={e => {
+                      if (!isDragging) (e.currentTarget as HTMLElement).style.background = 'rgba(176,28,40,0.04)';
+                    }}
                   >
-                    <input type="file" accept="image/*" multiple onChange={handleFileUpload} hidden />
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(176,28,40,0.18)', border: '1px solid rgba(176,28,40,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                      {uploadingImage ? <RefreshCw size={20} className="animate-spin" style={{ color: 'var(--red-vivid)' }} /> : <UploadCloud size={22} style={{ color: 'var(--red-vivid)' }} />}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      multiple
+                      onChange={handleFileUpload}
+                      style={{ display: 'none' }}
+                    />
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 14,
+                      background: 'rgba(176,28,40,0.18)', border: '1px solid rgba(176,28,40,0.35)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10
+                    }}>
+                      {uploadingImage ? <RefreshCw size={22} className="animate-spin" style={{ color: 'var(--red-vivid)' }} /> : <UploadCloud size={24} style={{ color: 'var(--red-vivid)' }} />}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#FFFFFF', fontFamily: 'Outfit' }}>
-                      {uploadingImage ? 'Uploading image files to server...' : 'Click to Upload Images or Drag & Drop Files'}
+                    <div style={{ fontSize: 14.5, fontWeight: 800, color: '#FFFFFF', fontFamily: 'Outfit' }}>
+                      {uploadingImage ? 'Uploading image files to server...' : isDragging ? 'Drop Image Files Here' : 'Click to Upload Images or Drag & Drop Files'}
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
-                      Supports PNG, JPG, WEBP formats (Max 5MB each)
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 4, fontFamily: 'Inter' }}>
+                      Supports PNG, JPG, WEBP, GIF, SVG formats (up to 25MB each)
                     </div>
-                  </label>
+                  </div>
 
                   {/* Active Images Thumbnails Gallery Grid */}
                   {imageInput && imageInput.split(',').map(s => s.trim()).filter(Boolean).length > 0 && (
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, fontFamily: 'Outfit' }}>
-                        Attached Product Photos
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Outfit' }}>
+                          Attached Product Photos ({imageInput.split(',').map(s => s.trim()).filter(Boolean).length})
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setImageInput('')}
+                          style={{ background: 'none', border: 'none', color: '#F87171', fontSize: 11, fontWeight: 700, fontFamily: 'Outfit', cursor: 'pointer', padding: 0 }}
+                        >
+                          Remove All
+                        </button>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12 }}>
                         {imageInput.split(',').map(s => s.trim()).filter(Boolean).map((imgUrl, idx) => (
-                          <div key={idx} style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)', background: '#08080C' }}>
-                            <img src={imgUrl} alt="Product Media" style={{ width: '100%', height: 80, objectFit: 'cover' }} />
-                            {idx === 0 && (
-                              <span style={{ position: 'absolute', bottom: 4, left: 4, fontSize: 9, fontWeight: 900, background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: 4, fontFamily: 'Outfit' }}>
-                                MAIN
+                          <div key={idx} style={{
+                            position: 'relative', borderRadius: 12, overflow: 'hidden',
+                            border: idx === 0 ? '2px solid #10B981' : '1px solid rgba(255,255,255,0.15)',
+                            background: '#08080C'
+                          }}>
+                            <img
+                              src={imgUrl}
+                              alt="Product Media"
+                              style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }}
+                              onError={e => {
+                                (e.currentTarget as HTMLElement).style.opacity = '0.4';
+                              }}
+                            />
+                            
+                            {idx === 0 ? (
+                              <span style={{
+                                position: 'absolute', bottom: 6, left: 6, fontSize: 9, fontWeight: 900,
+                                background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: 4, fontFamily: 'Outfit',
+                                display: 'flex', alignItems: 'center', gap: 3
+                              }}>
+                                <Star size={9} fill="#fff" /> MAIN
                               </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleSetMainImage(imgUrl)}
+                                style={{
+                                  position: 'absolute', bottom: 6, left: 6, fontSize: 9, fontWeight: 800,
+                                  background: 'rgba(0,0,0,0.75)', color: '#fff', padding: '2px 6px', borderRadius: 4,
+                                  border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontFamily: 'Outfit'
+                                }}
+                                title="Set as Main Cover Photo"
+                              >
+                                Set Main
+                              </button>
                             )}
+
                             <button
                               type="button"
                               onClick={() => handleRemoveImage(imgUrl)}
                               style={{
-                                position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%',
+                                position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: '50%',
                                 background: 'rgba(239,68,68,0.9)', border: 'none', color: '#fff', cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
                               }}
-                              title="Remove image"
+                              title="Remove photo"
                             >
                               <X size={12} />
                             </button>
@@ -855,6 +978,100 @@ export default function AdminProducts() {
 
               </form>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Quick Add Custom Brand Modal */}
+      <AnimatePresence>
+        {brandModalOpen && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)' }}
+              onClick={() => setBrandModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 15 }}
+              style={{
+                position: 'relative', width: '100%', maxWidth: 420,
+                background: '#14141E', border: '1.5px solid rgba(176,28,40,0.4)',
+                borderRadius: 22, padding: '26px 24px',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.9)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h4 style={{ fontFamily: 'Outfit', fontSize: 18, fontWeight: 900, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  🏸 Add Custom Brand
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setBrandModalOpen(false)}
+                  style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 18, fontFamily: 'Inter', lineHeight: 1.5 }}>
+                Enter the brand name to register it into your catalog and automatically assign it to this product.
+              </p>
+
+              <div style={{ marginBottom: 22 }}>
+                <label style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 8, fontFamily: 'Outfit' }}>
+                  Brand Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mizuno, Ashaway, Babolat..."
+                  value={customBrandName}
+                  onChange={e => setCustomBrandName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveCustomBrand();
+                    }
+                  }}
+                  autoFocus
+                  style={{
+                    width: '100%', padding: '12px 16px', background: '#1A1A28',
+                    border: '1.5px solid rgba(176,28,40,0.5)', borderRadius: 12,
+                    color: '#FFFFFF', fontSize: 14, fontFamily: 'Outfit', outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setBrandModalOpen(false)}
+                  style={{
+                    padding: '10px 18px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff', cursor: 'pointer', fontFamily: 'Outfit'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCustomBrand}
+                  disabled={addingBrandLoading || !customBrandName.trim()}
+                  style={{
+                    padding: '10px 22px', borderRadius: 12, fontSize: 13, fontWeight: 900,
+                    fontFamily: 'Outfit', background: 'linear-gradient(135deg, #B01C28 0%, #8A121D 100%)',
+                    border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    boxShadow: '0 4px 14px rgba(176,28,40,0.45)',
+                    opacity: !customBrandName.trim() ? 0.6 : 1
+                  }}
+                >
+                  {addingBrandLoading ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                  Save & Select Brand
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

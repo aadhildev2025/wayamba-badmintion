@@ -21,8 +21,8 @@ const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
 // Core Middleware
 app.use((0, cors_1.default)({ origin: '*' })); // Enable CORS for Next.js / Vite client
-app.use(express_1.default.json());
-app.use(express_1.default.urlencoded({ extended: true }));
+app.use(express_1.default.json({ limit: '50mb' }));
+app.use(express_1.default.urlencoded({ limit: '50mb', extended: true }));
 // Connect to MongoDB on incoming request
 app.use(async (req, res, next) => {
     // Allow health check without blocking on DB

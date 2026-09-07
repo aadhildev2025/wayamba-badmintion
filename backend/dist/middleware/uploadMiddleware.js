@@ -55,32 +55,21 @@ try {
 catch {
     // Read-only filesystem in serverless environments
 }
-// When Cloudinary is active or in Vercel, use memory storage for buffer access
-const storage = ((0, exports.isCloudinaryReady)() || isVercel)
-    ? multer_1.default.memoryStorage()
-    : multer_1.default.diskStorage({
-        destination: (req, file, cb) => {
-            cb(null, uploadDir);
-        },
-        filename: (req, file, cb) => {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-            const ext = path_1.default.extname(file.originalname);
-            cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-        },
-    });
+// Use memory storage so router has access to file.buffer for Cloudinary, local disk fallback, or data URL fallback
+const storage = multer_1.default.memoryStorage();
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|webp|gif/;
-    const extname = allowedTypes.test(path_1.default.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    if (extname && mimetype) {
+    const allowedExtensions = /\.(jpeg|jpg|png|webp|gif|svg|avif|jfif|bmp|ico)$/i;
+    const isImageMime = file.mimetype && (file.mimetype.startsWith('image/') || file.mimetype === 'application/octet-stream');
+    const hasImageExt = allowedExtensions.test(file.originalname);
+    if (isImageMime || hasImageExt) {
         return cb(null, true);
     }
     else {
-        cb(new Error('Images only (jpeg, jpg, png, webp, gif)'));
+        cb(new Error('Only image files are allowed (JPEG, PNG, WEBP, GIF, SVG, AVIF, BMP)'));
     }
 };
 exports.upload = (0, multer_1.default)({
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit per file
     fileFilter,
 });
