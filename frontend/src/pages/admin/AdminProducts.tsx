@@ -55,9 +55,9 @@ export default function AdminProducts() {
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState(0);
+  const [price, setPrice] = useState<number | string>('');
   const [salePrice, setSalePrice] = useState('');
-  const [stockQuantity, setStockQuantity] = useState(0);
+  const [stockQuantity, setStockQuantity] = useState<number | string>('');
   const [imageInput, setImageInput] = useState('');
   const [brandId, setBrandId] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -75,9 +75,10 @@ export default function AdminProducts() {
   const [specKey, setSpecKey] = useState('');
   const [specVal, setSpecVal] = useState('');
 
+  const [urlToAdd, setUrlToAdd] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Instant parallel image uploader
+  // Instant parallel image uploader with Cloudinary & fallback
   const uploadFiles = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return;
 
@@ -97,15 +98,45 @@ export default function AdminProducts() {
         const combined = Array.from(new Set([...currentList, ...uploadedUrls]));
         setImageInput(combined.join(', '));
       } else {
-        alert('Server did not return uploaded image URLs. Please try again.');
+        throw new Error('Server did not return uploaded image URLs');
       }
     } catch (err: any) {
-      console.error('Image upload error:', err);
-      alert(err.response?.data?.message || 'Failed to upload images. Please check file format or try again.');
+      console.warn('Image upload API failed, applying client data URI fallback:', err);
+      // Resilient fallback: read as data URI if network or serverless upload fails
+      try {
+        const dataUrlPromises = Array.from(files).map(file => {
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(file);
+          });
+        });
+        const dataUrls = (await Promise.all(dataUrlPromises)).filter(Boolean);
+        if (dataUrls.length > 0) {
+          const currentList = imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean) : [];
+          const combined = Array.from(new Set([...currentList, ...dataUrls]));
+          setImageInput(combined.join(', '));
+        } else {
+          alert(err.response?.data?.message || 'Failed to upload images. Please check file format or try again.');
+        }
+      } catch {
+        alert(err.response?.data?.message || 'Failed to process images.');
+      }
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleAddImageUrl = () => {
+    const trimmed = urlToAdd.trim();
+    if (!trimmed) return;
+    const currentList = imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean) : [];
+    if (!currentList.includes(trimmed)) {
+      setImageInput([...currentList, trimmed].join(', '));
+    }
+    setUrlToAdd('');
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -189,14 +220,15 @@ export default function AdminProducts() {
     setModalOpen(true);
     setBrandModalOpen(false);
     setCustomBrandName('');
+    setUrlToAdd('');
     
     if (prod) {
       setName(prod.name);
       setSku(prod.sku);
       setDescription(prod.description);
-      setPrice(prod.price);
+      setPrice(prod.price ?? '');
       setSalePrice(prod.salePrice ? String(prod.salePrice) : '');
-      setStockQuantity(prod.stockQuantity);
+      setStockQuantity(prod.stockQuantity ?? '');
       setImageInput(prod.images.join(', '));
       setBrandId(typeof prod.brand === 'object' ? prod.brand._id : prod.brand);
       setCategoryId(typeof prod.category === 'object' ? prod.category._id : prod.category);
@@ -208,9 +240,9 @@ export default function AdminProducts() {
       setName('');
       setSku('');
       setDescription('');
-      setPrice(0);
+      setPrice('');
       setSalePrice('');
-      setStockQuantity(0);
+      setStockQuantity('');
       setImageInput('');
       setBrandId(brands[0]?._id || '');
       setCategoryId(categories[0]?._id || '');
@@ -457,7 +489,12 @@ export default function AdminProducts() {
                 return (
                   <tr key={p._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} className="table-row-hover">
                     <td style={{ padding: '14px 20px' }}>
-                      <img src={mainImage} alt={p.name} style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.12)', background: '#060609' }} />
+                      <img
+                        src={mainImage}
+                        alt={p.name}
+                        onError={e => { (e.currentTarget as HTMLImageElement).src = '/imgs/hero_rackets.png'; }}
+                        style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.12)', background: '#060609' }}
+                      />
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       <div style={{ fontWeight: 700, fontSize: 14, color: '#FFFFFF', fontFamily: 'Outfit' }}>{p.name}</div>
@@ -599,13 +636,26 @@ export default function AdminProducts() {
                       type="number"
                       placeholder="48500"
                       value={price}
-                      onChange={e => setPrice(Number(e.target.value))}
+                      onChange={e => setPrice(e.target.value)}
+                      onFocus={e => {
+                        if (price === 0 || price === '0' || e.target.value === '0') {
+                          setPrice('');
+                        } else {
+                          e.target.select();
+                        }
+                      }}
+                      onClick={e => {
+                        if (price === 0 || price === '0' || (e.currentTarget as HTMLInputElement).value === '0') {
+                          setPrice('');
+                        }
+                      }}
                       style={{
                         width: '100%', padding: '12px 16px', background: '#161622',
                         border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 14,
                         color: '#FFFFFF', fontSize: 14, fontFamily: 'Outfit', fontWeight: 700, outline: 'none'
                       }}
                       required
+                      min={1}
                     />
                   </div>
                   <div>
@@ -615,11 +665,24 @@ export default function AdminProducts() {
                       placeholder="45000"
                       value={salePrice}
                       onChange={e => setSalePrice(e.target.value)}
+                      onFocus={e => {
+                        if (salePrice === '0' || e.target.value === '0') {
+                          setSalePrice('');
+                        } else {
+                          e.target.select();
+                        }
+                      }}
+                      onClick={e => {
+                        if (salePrice === '0' || (e.currentTarget as HTMLInputElement).value === '0') {
+                          setSalePrice('');
+                        }
+                      }}
                       style={{
                         width: '100%', padding: '12px 16px', background: '#161622',
                         border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 14,
                         color: '#FFFFFF', fontSize: 14, fontFamily: 'Outfit', fontWeight: 700, outline: 'none'
                       }}
+                      min={1}
                     />
                   </div>
                   <div>
@@ -628,13 +691,26 @@ export default function AdminProducts() {
                       type="number"
                       placeholder="10"
                       value={stockQuantity}
-                      onChange={e => setStockQuantity(Number(e.target.value))}
+                      onChange={e => setStockQuantity(e.target.value)}
+                      onFocus={e => {
+                        if (stockQuantity === 0 || stockQuantity === '0' || e.target.value === '0') {
+                          setStockQuantity('');
+                        } else {
+                          e.target.select();
+                        }
+                      }}
+                      onClick={e => {
+                        if (stockQuantity === 0 || stockQuantity === '0' || (e.currentTarget as HTMLInputElement).value === '0') {
+                          setStockQuantity('');
+                        }
+                      }}
                       style={{
                         width: '100%', padding: '12px 16px', background: '#161622',
                         border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 14,
                         color: '#FFFFFF', fontSize: 14, fontFamily: 'Outfit', fontWeight: 700, outline: 'none'
                       }}
                       required
+                      min={0}
                     />
                   </div>
                 </div>
@@ -800,6 +876,39 @@ export default function AdminProducts() {
                     </div>
                   </div>
 
+                  {/* Direct Image URL input option */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                    <input
+                      type="url"
+                      placeholder="Or paste direct image URL (https://...)"
+                      value={urlToAdd}
+                      onChange={e => setUrlToAdd(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddImageUrl();
+                        }
+                      }}
+                      style={{
+                        flex: 1, padding: '10px 14px', background: '#0D0D14',
+                        border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: 10,
+                        color: '#FFFFFF', fontSize: 13, fontFamily: 'Outfit', outline: 'none'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddImageUrl}
+                      style={{
+                        padding: '10px 16px', background: 'rgba(255,255,255,0.08)',
+                        border: '1px solid rgba(255,255,255,0.18)', borderRadius: 10,
+                        color: '#FFFFFF', fontSize: 13, fontWeight: 700, fontFamily: 'Outfit',
+                        cursor: 'pointer', whiteSpace: 'nowrap'
+                      }}
+                    >
+                      + Add URL
+                    </button>
+                  </div>
+
                   {/* Active Images Thumbnails Gallery Grid */}
                   {imageInput && imageInput.split(',').map(s => s.trim()).filter(Boolean).length > 0 && (
                     <div style={{ marginBottom: 8 }}>
@@ -828,7 +937,7 @@ export default function AdminProducts() {
                               alt="Product Media"
                               style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }}
                               onError={e => {
-                                (e.currentTarget as HTMLElement).style.opacity = '0.4';
+                                (e.currentTarget as HTMLImageElement).src = '/imgs/hero_rackets.png';
                               }}
                             />
                             

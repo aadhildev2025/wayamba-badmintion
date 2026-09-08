@@ -329,7 +329,17 @@ export default function AdminCoupons() {
                   </div>
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>{discountType === 'PERCENT' ? 'Percentage (%)' : 'Amount (Rs.)'}</label>
-                    <input type="number" placeholder={discountType === 'PERCENT' ? '10' : '500'} value={discountValue} onChange={e => setDiscountValue(Number(e.target.value))} className="input-field" required min={1} />
+                    <input
+                      type="number"
+                      placeholder={discountType === 'PERCENT' ? '10' : '500'}
+                      value={discountValue}
+                      onChange={e => setDiscountValue(Number(e.target.value))}
+                      onFocus={e => { if (discountValue === 0) setDiscountValue('' as any); else e.target.select(); }}
+                      onClick={() => { if (discountValue === 0) setDiscountValue('' as any); }}
+                      className="input-field"
+                      required
+                      min={1}
+                    />
                   </div>
                 </div>
 
@@ -337,7 +347,16 @@ export default function AdminCoupons() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>Min Order (Rs.)</label>
-                    <input type="number" placeholder="2000" value={minOrderAmount} onChange={e => setMinOrderAmount(Number(e.target.value))} className="input-field" min={0} />
+                    <input
+                      type="number"
+                      placeholder="2000"
+                      value={minOrderAmount}
+                      onChange={e => setMinOrderAmount(Number(e.target.value))}
+                      onFocus={e => { if (minOrderAmount === 0) setMinOrderAmount('' as any); else e.target.select(); }}
+                      onClick={() => { if (minOrderAmount === 0) setMinOrderAmount('' as any); }}
+                      className="input-field"
+                      min={0}
+                    />
                   </div>
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>Expiry Date</label>
@@ -349,7 +368,16 @@ export default function AdminCoupons() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>Usage Limit (Optional)</label>
-                    <input type="number" placeholder="Unlimited" value={usageLimit} onChange={e => setUsageLimit(e.target.value)} className="input-field" min={1} />
+                    <input
+                      type="number"
+                      placeholder="Unlimited"
+                      value={usageLimit}
+                      onChange={e => setUsageLimit(e.target.value)}
+                      onFocus={e => { if (usageLimit === '0') setUsageLimit(''); else e.target.select(); }}
+                      onClick={() => { if (usageLimit === '0') setUsageLimit(''); }}
+                      className="input-field"
+                      min={1}
+                    />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 24 }}>
                     <input type="checkbox" id="couponActive" checked={active} onChange={e => setActive(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#CC1B1B' }} />

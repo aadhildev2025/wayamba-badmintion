@@ -341,7 +341,7 @@ router.get('/:idOrSlug/reviews', async (req, res) => {
   }
 });
 
-// POST upload multiple images (Lightning-fast storage)
+// POST upload multiple images (Cloudinary CDN with local/base64 fallback)
 router.post('/upload', protect, restrictTo('SUPER_ADMIN', 'STAFF'), (req, res) => {
   upload.array('images', 10)(req, res, async (err: any) => {
     if (err) {
@@ -353,6 +353,23 @@ router.post('/upload', protect, restrictTo('SUPER_ADMIN', 'STAFF'), (req, res) =
     }
     const files = req.files as Express.Multer.File[];
     try {
+      // 1. Primary: Upload to Cloudinary for permanent, high-speed CDN URLs
+      if (isCloudinaryReady()) {
+        try {
+          const uploadPromises = files.map(async (file) => {
+            if (file.buffer) {
+              return await uploadToCloudinary(file.buffer, 'wayamba_products');
+            }
+            throw new Error('Missing file buffer for upload');
+          });
+          const urls = await Promise.all(uploadPromises);
+          return res.json({ urls, imageUrls: urls });
+        } catch (cloudinaryErr: any) {
+          console.error('Cloudinary upload failed, falling back:', cloudinaryErr);
+        }
+      }
+
+      // 2. Fallback: Local disk if available, or base64 data URI
       const publicUploadsDir = path.join(__dirname, '../../public/uploads');
       try {
         if (!fs.existsSync(publicUploadsDir)) {
