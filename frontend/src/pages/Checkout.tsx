@@ -249,7 +249,7 @@ export default function Checkout() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
                 <div>
                   <label style={labelStyle}>Full Name *</label>
-                  <input type="text" required placeholder="e.g. Aadhil Mohamed" value={fullName} onChange={e => setFullName(e.target.value)} style={inputStyle} />
+                  <input type="text" required placeholder="e.g. Wayamba Badminton" value={fullName} onChange={e => setFullName(e.target.value)} style={inputStyle} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   <div>

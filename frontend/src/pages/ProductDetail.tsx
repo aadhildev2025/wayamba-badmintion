@@ -501,7 +501,7 @@ export default function ProductDetail() {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Aadhil Mohamed"
+                      placeholder="e.g. Wayamba Badminton"
                       value={reviewerName}
                       onChange={e => setReviewerName(e.target.value)}
                       style={{

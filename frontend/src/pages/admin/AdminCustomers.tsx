@@ -233,7 +233,7 @@ export default function AdminCustomers() {
                     <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>Full Name</label>
                     <input
                       type="text"
-                      placeholder="e.g. Aadhil"
+                      placeholder="e.g. Wayamba Badminton"
                       value={staffName}
                       onChange={e => setStaffName(e.target.value)}
                       style={{
