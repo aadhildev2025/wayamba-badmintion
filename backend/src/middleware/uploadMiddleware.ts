@@ -33,6 +33,9 @@ export const uploadToCloudinary = (fileBuffer: Buffer, folder = 'wayamba_product
       {
         folder,
         resource_type: 'image',
+        transformation: [
+          { width: 1600, height: 1600, crop: 'limit', quality: 'auto:good', fetch_format: 'auto' }
+        ],
       },
       (error, result) => {
         if (error || !result) {
