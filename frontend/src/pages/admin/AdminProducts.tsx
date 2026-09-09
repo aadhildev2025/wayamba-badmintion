@@ -58,7 +58,7 @@ export default function AdminProducts() {
   const [price, setPrice] = useState<number | string>('');
   const [salePrice, setSalePrice] = useState('');
   const [stockQuantity, setStockQuantity] = useState<number | string>('');
-  const [imageInput, setImageInput] = useState('');
+  const [imageList, setImageList] = useState<string[]>([]);
   const [brandId, setBrandId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [status, setStatus] = useState<'active' | 'draft'>('active');
@@ -152,9 +152,7 @@ export default function AdminProducts() {
       });
       const uploadedUrls: string[] = res.data.urls || res.data.imageUrls || [];
       if (Array.isArray(uploadedUrls) && uploadedUrls.length > 0) {
-        const currentList = imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean) : [];
-        const combined = Array.from(new Set([...currentList, ...uploadedUrls]));
-        setImageInput(combined.join(', '));
+        setImageList(prev => Array.from(new Set([...prev, ...uploadedUrls])));
       } else {
         throw new Error('Server did not return uploaded image URLs');
       }
@@ -175,9 +173,7 @@ export default function AdminProducts() {
         });
         const dataUrls = (await Promise.all(dataUrlPromises)).filter(Boolean);
         if (dataUrls.length > 0) {
-          const currentList = imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean) : [];
-          const combined = Array.from(new Set([...currentList, ...dataUrls]));
-          setImageInput(combined.join(', '));
+          setImageList(prev => Array.from(new Set([...prev, ...dataUrls])));
         } else {
           alert(err.response?.data?.message || 'Failed to upload images. Please check file format or try again.');
         }
@@ -193,10 +189,7 @@ export default function AdminProducts() {
   const handleAddImageUrl = () => {
     const trimmed = urlToAdd.trim();
     if (!trimmed) return;
-    const currentList = imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean) : [];
-    if (!currentList.includes(trimmed)) {
-      setImageInput([...currentList, trimmed].join(', '));
-    }
+    setImageList(prev => prev.includes(trimmed) ? prev : [...prev, trimmed]);
     setUrlToAdd('');
   };
 
@@ -207,15 +200,11 @@ export default function AdminProducts() {
   };
 
   const handleSetMainImage = (urlToSet: string) => {
-    const currentList = imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean) : [];
-    const reordered = [urlToSet, ...currentList.filter(u => u !== urlToSet)];
-    setImageInput(reordered.join(', '));
+    setImageList(prev => [urlToSet, ...prev.filter(u => u !== urlToSet)]);
   };
 
   const handleRemoveImage = (urlToRemove: string) => {
-    const currentList = imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean) : [];
-    const filtered = currentList.filter(url => url !== urlToRemove);
-    setImageInput(filtered.join(', '));
+    setImageList(prev => prev.filter(url => url !== urlToRemove));
   };
 
   // Custom Brand Creator
@@ -290,7 +279,20 @@ export default function AdminProducts() {
       setPrice(prod.price ?? '');
       setSalePrice(prod.salePrice ? String(prod.salePrice) : '');
       setStockQuantity(prod.stockQuantity ?? '');
-      setImageInput(prod.images.join(', '));
+      
+      const rawImgs = Array.isArray(prod.images) ? prod.images : [];
+      const resolvedImgs: string[] = [];
+      for (let i = 0; i < rawImgs.length; i++) {
+        const item = rawImgs[i];
+        const next = rawImgs[i + 1];
+        if (typeof item === 'string' && item.startsWith('data:image/') && item.endsWith(';base64') && typeof next === 'string') {
+          resolvedImgs.push(item + ',' + next);
+          i++;
+        } else if (typeof item === 'string' && item.trim()) {
+          resolvedImgs.push(item.trim());
+        }
+      }
+      setImageList(resolvedImgs);
       setBrandId(typeof prod.brand === 'object' ? prod.brand._id : prod.brand);
       setCategoryId(typeof prod.category === 'object' ? prod.category._id : prod.category);
       setStatus(prod.status);
@@ -304,7 +306,7 @@ export default function AdminProducts() {
       setPrice('');
       setSalePrice('');
       setStockQuantity('');
-      setImageInput('');
+      setImageList([]);
       setBrandId(brands[0]?._id || '');
       setCategoryId(categories[0]?._id || '');
       setStatus('active');
@@ -356,7 +358,7 @@ export default function AdminProducts() {
       price: finalPrice,
       salePrice: salePriceVal,
       stockQuantity: Number(stockQuantity),
-      images: imageInput.split(',').map(s => s.trim()).filter(Boolean),
+      images: imageList,
       brand: resolvedBrand,
       category: categoryId,
       status,
@@ -876,7 +878,7 @@ export default function AdminProducts() {
                       <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter' }}>Upload photos from computer or drag & drop files.</span>
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(176,28,40,0.18)', color: 'var(--red-vivid)', padding: '4px 12px', borderRadius: 99, border: '1px solid rgba(176,28,40,0.3)', fontFamily: 'Outfit' }}>
-                      {imageInput ? imageInput.split(',').map(s => s.trim()).filter(Boolean).length : 0} Images Attached
+                      {imageList.length} Images Attached
                     </span>
                   </div>
 
@@ -971,15 +973,15 @@ export default function AdminProducts() {
                   </div>
 
                   {/* Active Images Thumbnails Gallery Grid */}
-                  {imageInput && imageInput.split(',').map(s => s.trim()).filter(Boolean).length > 0 && (
+                  {imageList.length > 0 && (
                     <div style={{ marginBottom: 8 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                         <div style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Outfit' }}>
-                          Attached Product Photos ({imageInput.split(',').map(s => s.trim()).filter(Boolean).length})
+                          Attached Product Photos ({imageList.length})
                         </div>
                         <button
                           type="button"
-                          onClick={() => setImageInput('')}
+                          onClick={() => setImageList([])}
                           style={{ background: 'none', border: 'none', color: '#F87171', fontSize: 11, fontWeight: 700, fontFamily: 'Outfit', cursor: 'pointer', padding: 0 }}
                         >
                           Remove All
@@ -987,7 +989,7 @@ export default function AdminProducts() {
                       </div>
                       
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12 }}>
-                        {imageInput.split(',').map(s => s.trim()).filter(Boolean).map((imgUrl, idx) => (
+                        {imageList.map((imgUrl, idx) => (
                           <div key={idx} style={{
                             position: 'relative', borderRadius: 12, overflow: 'hidden',
                             border: idx === 0 ? '2px solid #10B981' : '1px solid rgba(255,255,255,0.15)',
