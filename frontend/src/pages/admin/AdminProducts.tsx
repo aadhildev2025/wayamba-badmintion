@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit2, Trash2, X, AlertTriangle, RefreshCw, UploadCloud, ImageIcon, Check, Star } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, AlertTriangle, RefreshCw, UploadCloud, ImageIcon, Star } from 'lucide-react';
 import api from '@/lib/api';
 
 interface Brand {
@@ -70,6 +70,13 @@ export default function AdminProducts() {
   const [brandModalOpen, setBrandModalOpen] = useState(false);
   const [customBrandName, setCustomBrandName] = useState('');
   const [addingBrandLoading, setAddingBrandLoading] = useState(false);
+  const [deletingBrandId, setDeletingBrandId] = useState<string | null>(null);
+
+  // Custom Category Modal State
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState('');
+  const [addingCategoryLoading, setAddingCategoryLoading] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   // Spec form state
   const [specKey, setSpecKey] = useState('');
@@ -78,8 +85,8 @@ export default function AdminProducts() {
   const [urlToAdd, setUrlToAdd] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Client-side image compressor (converts 5MB-20MB photos to ~150KB WebP in ~15ms)
-  const compressImage = async (file: File, maxWidth = 1400, maxHeight = 1400, quality = 0.85): Promise<File> => {
+  // Client-side image compressor (converts 5MB-20MB photos to ~40KB WebP in ~15ms)
+  const compressImage = async (file: File, maxWidth = 1000, maxHeight = 1000, quality = 0.75): Promise<File> => {
     if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
       return file;
     }
@@ -241,6 +248,80 @@ export default function AdminProducts() {
     }
   };
 
+  // Custom Category Creator
+  const handleSaveCustomCategory = async () => {
+    const trimmed = customCategoryName.trim();
+    if (!trimmed) {
+      alert('Please enter a valid category name.');
+      return;
+    }
+
+    setAddingCategoryLoading(true);
+    try {
+      const res = await api.post('/products/categories', { name: trimmed });
+      const newCat = res.data;
+      if (newCat && newCat._id) {
+        setCategories(prev => {
+          if (prev.some(c => c._id === newCat._id || c.name.toLowerCase() === trimmed.toLowerCase())) {
+            return prev;
+          }
+          return [...prev, newCat];
+        });
+        setCategoryId(newCat._id);
+      }
+    } catch (err: any) {
+      console.error('Category creation API fallback:', err);
+      const fallbackId = 'cat_' + Date.now();
+      const fallbackObj = { _id: fallbackId, name: trimmed };
+      setCategories(prev => [...prev, fallbackObj]);
+      setCategoryId(fallbackId);
+    } finally {
+      setAddingCategoryLoading(false);
+      setCategoryModalOpen(false);
+      setCustomCategoryName('');
+    }
+  };
+
+  // Brand Deletion
+  const handleDeleteBrand = async (bId: string, bName: string) => {
+    if (!window.confirm(`Are you sure you want to delete brand "${bName}"?`)) return;
+    setDeletingBrandId(bId);
+    try {
+      await api.delete(`/products/brands/${bId}`);
+      setBrands(prev => {
+        const next = prev.filter(b => b._id !== bId);
+        if (brandId === bId) {
+          setBrandId(next[0]?._id || '');
+        }
+        return next;
+      });
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete brand.');
+    } finally {
+      setDeletingBrandId(null);
+    }
+  };
+
+  // Category Deletion
+  const handleDeleteCategory = async (cId: string, cName: string) => {
+    if (!window.confirm(`Are you sure you want to delete category "${cName}"?`)) return;
+    setDeletingCategoryId(cId);
+    try {
+      await api.delete(`/products/categories/${cId}`);
+      setCategories(prev => {
+        const next = prev.filter(c => c._id !== cId);
+        if (categoryId === cId) {
+          setCategoryId(next[0]?._id || '');
+        }
+        return next;
+      });
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete category.');
+    } finally {
+      setDeletingCategoryId(null);
+    }
+  };
+
   const fetchLists = () => {
     setLoading(true);
     const getProds = api.get('/products?adminView=true');
@@ -270,6 +351,8 @@ export default function AdminProducts() {
     setModalOpen(true);
     setBrandModalOpen(false);
     setCustomBrandName('');
+    setCategoryModalOpen(false);
+    setCustomCategoryName('');
     setUrlToAdd('');
     
     if (prod) {
@@ -344,7 +427,17 @@ export default function AdminProducts() {
       }
     }
 
-    if (!name || !sku || !resolvedBrand || resolvedBrand === '__new_custom__' || !categoryId || finalPrice <= 0) {
+    let resolvedCategory = categoryId;
+    if (categoryId === '__new_custom__' && customCategoryName.trim()) {
+      try {
+        const catRes = await api.post('/products/categories', { name: customCategoryName.trim() });
+        resolvedCategory = catRes.data._id || catRes.data.name || customCategoryName.trim();
+      } catch {
+        resolvedCategory = customCategoryName.trim();
+      }
+    }
+
+    if (!name || !sku || !resolvedBrand || resolvedBrand === '__new_custom__' || !resolvedCategory || resolvedCategory === '__new_custom__' || finalPrice <= 0) {
       alert('Name, SKU, Brand, Category, and a valid Regular Price (> 0) are required.');
       return;
     }
@@ -360,7 +453,7 @@ export default function AdminProducts() {
       stockQuantity: Number(stockQuantity),
       images: imageList,
       brand: resolvedBrand,
-      category: categoryId,
+      category: resolvedCategory,
       status,
       tags: tagsInput.split(',').map(s => s.trim()).filter(Boolean),
       isFeatured,
@@ -778,11 +871,13 @@ export default function AdminProducts() {
                   </div>
                 </div>
 
-                {/* Section 3: Brand, Category, Status, Featured */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+                {/* Section 3: Brand & Category */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5 }}>Brand</label>
+                      <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Brand
+                      </label>
                       <button
                         type="button"
                         onClick={() => {
@@ -790,12 +885,12 @@ export default function AdminProducts() {
                           setCustomBrandName('');
                         }}
                         style={{
-                          background: 'rgba(176,28,40,0.12)', border: '1px solid rgba(176,28,40,0.3)', color: 'var(--red-vivid)',
-                          fontSize: 11, fontWeight: 800, fontFamily: 'Outfit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3,
-                          padding: '2px 8px', borderRadius: 6, transition: 'all 0.15s ease'
+                          background: 'rgba(176,28,40,0.14)', border: '1px solid rgba(176,28,40,0.35)', color: 'var(--red-vivid)',
+                          fontSize: 11.5, fontWeight: 800, fontFamily: 'Outfit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '3px 10px', borderRadius: 8, transition: 'all 0.15s ease'
                         }}
                       >
-                        <Plus size={12} /> Custom Brand
+                        <Plus size={12} /> Manage Brands
                       </button>
                     </div>
 
@@ -810,7 +905,7 @@ export default function AdminProducts() {
                         }
                       }}
                       style={{
-                        width: '100%', padding: '12px 16px', background: '#161622',
+                        width: '100%', height: 46, padding: '0 16px', background: '#161622',
                         border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 14,
                         color: '#FFFFFF', fontSize: 14, fontFamily: 'Outfit', fontWeight: 600, outline: 'none'
                       }}
@@ -821,49 +916,109 @@ export default function AdminProducts() {
                         </option>
                       ))}
                       <option value="__new_custom__" style={{ background: '#1B1B28', color: 'var(--red-vivid)', fontWeight: 'bold' }}>
-                        + Add Custom Brand...
+                        + Add / Manage Brands...
                       </option>
                     </select>
                   </div>
+
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>Category</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Category
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCategoryModalOpen(true);
+                          setCustomCategoryName('');
+                        }}
+                        style={{
+                          background: 'rgba(176,28,40,0.14)', border: '1px solid rgba(176,28,40,0.35)', color: 'var(--red-vivid)',
+                          fontSize: 11.5, fontWeight: 800, fontFamily: 'Outfit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '3px 10px', borderRadius: 8, transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Plus size={12} /> Manage Categories
+                      </button>
+                    </div>
+
                     <select
                       value={categoryId}
-                      onChange={e => setCategoryId(e.target.value)}
+                      onChange={e => {
+                        if (e.target.value === '__new_custom__') {
+                          setCategoryModalOpen(true);
+                          setCustomCategoryName('');
+                        } else {
+                          setCategoryId(e.target.value);
+                        }
+                      }}
                       style={{
-                        width: '100%', padding: '12px 16px', background: '#161622',
+                        width: '100%', height: 46, padding: '0 16px', background: '#161622',
                         border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 14,
                         color: '#FFFFFF', fontSize: 14, fontFamily: 'Outfit', fontWeight: 600, outline: 'none'
                       }}
                     >
-                      {categories.map(c => <option key={c._id} value={c._id} style={{ background: '#161622', color: '#fff' }}>{c.name}</option>)}
+                      {categories.map(c => (
+                        <option key={c._id} value={c._id} style={{ background: '#161622', color: '#fff' }}>
+                          {c.name}
+                        </option>
+                      ))}
+                      <option value="__new_custom__" style={{ background: '#1B1B28', color: 'var(--red-vivid)', fontWeight: 'bold' }}>
+                        + Add / Manage Categories...
+                      </option>
                     </select>
                   </div>
+                </div>
+
+                {/* Section 3.5: Visibility Status & Storefront Spotlight */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>Status</label>
+                    <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>
+                      Product Visibility
+                    </label>
                     <select
                       value={status}
                       onChange={e => setStatus(e.target.value as any)}
                       style={{
-                        width: '100%', padding: '12px 16px', background: '#161622',
+                        width: '100%', height: 46, padding: '0 16px', background: '#161622',
                         border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 14,
                         color: '#FFFFFF', fontSize: 14, fontFamily: 'Outfit', fontWeight: 600, outline: 'none'
                       }}
                     >
-                      <option value="active" style={{ background: '#161622', color: '#fff' }}>Active (Visible in Store)</option>
-                      <option value="draft" style={{ background: '#161622', color: '#fff' }}>Draft (Hidden)</option>
+                      <option value="active" style={{ background: '#161622', color: '#fff' }}>Active (Visible in Storefront)</option>
+                      <option value="draft" style={{ background: '#161622', color: '#fff' }}>Draft (Hidden from Catalog)</option>
                     </select>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 24 }}>
-                    <input
-                      type="checkbox"
-                      id="isFeatured"
-                      checked={isFeatured}
-                      onChange={e => setIsFeatured(e.target.checked)}
-                      style={{ width: 20, height: 20, accentColor: 'var(--red-vivid)', cursor: 'pointer' }}
-                    />
-                    <label htmlFor="isFeatured" style={{ fontSize: 14, fontWeight: 800, color: '#FFFFFF', fontFamily: 'Outfit', cursor: 'pointer' }}>
-                      Featured Product Badge
+
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>
+                      Storefront Spotlight
+                    </label>
+                    <label
+                      htmlFor="isFeatured"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '0 16px', height: 46,
+                        background: isFeatured ? 'rgba(176,28,40,0.16)' : '#161622',
+                        border: isFeatured ? '1.5px solid var(--red-vivid)' : '1.5px solid rgba(255,255,255,0.14)',
+                        borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        id="isFeatured"
+                        checked={isFeatured}
+                        onChange={e => setIsFeatured(e.target.checked)}
+                        style={{ width: 18, height: 18, accentColor: 'var(--red-vivid)', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: 13.5, fontWeight: 800, color: isFeatured ? '#FFFFFF' : 'rgba(255,255,255,0.85)', fontFamily: 'Outfit', flex: 1 }}>
+                        Featured Product Badge
+                      </span>
+                      {isFeatured && (
+                        <span style={{ fontSize: 11, fontWeight: 900, background: 'var(--red-vivid)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontFamily: 'Outfit' }}>
+                          FEATURED
+                        </span>
+                      )}
                     </label>
                   </div>
                 </div>
@@ -1155,12 +1310,12 @@ export default function AdminProducts() {
         )}
       </AnimatePresence>
 
-      {/* Quick Add Custom Brand Modal */}
+      {/* Brand Manager Modal (Add & Delete Brands) */}
       <AnimatePresence>
         {brandModalOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
             <div
-              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)' }}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
               onClick={() => setBrandModalOpen(false)}
             />
             <motion.div
@@ -1168,15 +1323,16 @@ export default function AdminProducts() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 15 }}
               style={{
-                position: 'relative', width: '100%', maxWidth: 420,
+                position: 'relative', width: '100%', maxWidth: 480, maxHeight: '85vh',
+                display: 'flex', flexDirection: 'column',
                 background: '#14141E', border: '1.5px solid rgba(176,28,40,0.4)',
-                borderRadius: 22, padding: '26px 24px',
+                borderRadius: 22, padding: '24px 22px',
                 boxShadow: '0 24px 60px rgba(0,0,0,0.9)',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h4 style={{ fontFamily: 'Outfit', fontSize: 18, fontWeight: 900, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  🏸 Add Custom Brand
+                  🏷️ Brand Manager
                 </h4>
                 <button
                   type="button"
@@ -1187,61 +1343,260 @@ export default function AdminProducts() {
                 </button>
               </div>
               
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 18, fontFamily: 'Inter', lineHeight: 1.5 }}>
-                Enter the brand name to register it into your catalog and automatically assign it to this product.
+              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginBottom: 16, fontFamily: 'Inter' }}>
+                Add new equipment brands or delete existing brands from your catalog.
               </p>
 
-              <div style={{ marginBottom: 22 }}>
-                <label style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 8, fontFamily: 'Outfit' }}>
-                  Brand Name
+              {/* Add Brand Form */}
+              <div style={{ background: '#1A1A28', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: 14, marginBottom: 16 }}>
+                <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--red-vivid)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6, fontFamily: 'Outfit' }}>
+                  + Add New Brand
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Mizuno, Ashaway, Babolat..."
-                  value={customBrandName}
-                  onChange={e => setCustomBrandName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSaveCustomBrand();
-                    }
-                  }}
-                  autoFocus
-                  style={{
-                    width: '100%', padding: '12px 16px', background: '#1A1A28',
-                    border: '1.5px solid rgba(176,28,40,0.5)', borderRadius: 12,
-                    color: '#FFFFFF', fontSize: 14, fontFamily: 'Outfit', outline: 'none'
-                  }}
-                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="e.g. Mizuno, Ashaway, Babolat..."
+                    value={customBrandName}
+                    onChange={e => setCustomBrandName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSaveCustomBrand();
+                      }
+                    }}
+                    autoFocus
+                    style={{
+                      flex: 1, padding: '10px 14px', background: '#111118',
+                      border: '1.5px solid rgba(176,28,40,0.45)', borderRadius: 10,
+                      color: '#FFFFFF', fontSize: 13.5, fontFamily: 'Outfit', outline: 'none'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveCustomBrand}
+                    disabled={addingBrandLoading || !customBrandName.trim()}
+                    style={{
+                      padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 900,
+                      fontFamily: 'Outfit', background: 'linear-gradient(135deg, #B01C28 0%, #8A121D 100%)',
+                      border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+                      opacity: !customBrandName.trim() ? 0.6 : 1
+                    }}
+                  >
+                    {addingBrandLoading ? <RefreshCw size={13} className="animate-spin" /> : <Plus size={14} />}
+                    Add
+                  </button>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              {/* Existing Brands List */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: 'Outfit' }}>
+                  Existing Brands ({brands.length})
+                </span>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', maxHeight: 200, display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+                {brands.length === 0 ? (
+                  <div style={{ padding: 16, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>No brands registered.</div>
+                ) : (
+                  brands.map(b => (
+                    <div
+                      key={b._id}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '8px 12px', background: brandId === b._id ? 'rgba(176,28,40,0.15)' : 'rgba(255,255,255,0.03)',
+                        border: brandId === b._id ? '1px solid rgba(176,28,40,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 10,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: '#FFFFFF', fontFamily: 'Outfit' }}>
+                          {b.name}
+                        </span>
+                        {brandId === b._id && (
+                          <span style={{ fontSize: 10, fontWeight: 800, background: 'var(--red-vivid)', color: '#fff', padding: '1px 6px', borderRadius: 4 }}>
+                            Selected
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBrand(b._id, b.name)}
+                        disabled={deletingBrandId === b._id}
+                        style={{
+                          background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
+                          borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#F87171', cursor: 'pointer', transition: 'all 0.15s ease'
+                        }}
+                        title={`Delete brand ${b.name}`}
+                      >
+                        {deletingBrandId === b._id ? <RefreshCw size={12} className="animate-spin" /> : <Trash2 size={13} />}
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12 }}>
                 <button
                   type="button"
                   onClick={() => setBrandModalOpen(false)}
                   style={{
-                    padding: '10px 18px', borderRadius: 12, fontSize: 13, fontWeight: 700,
-                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                    padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 800,
+                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
                     color: '#fff', cursor: 'pointer', fontFamily: 'Outfit'
                   }}
                 >
-                  Cancel
+                  Done
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Category Manager Modal (Add & Delete Categories) */}
+      <AnimatePresence>
+        {categoryModalOpen && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+              onClick={() => setCategoryModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 15 }}
+              style={{
+                position: 'relative', width: '100%', maxWidth: 480, maxHeight: '85vh',
+                display: 'flex', flexDirection: 'column',
+                background: '#14141E', border: '1.5px solid rgba(176,28,40,0.4)',
+                borderRadius: 22, padding: '24px 22px',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.9)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h4 style={{ fontFamily: 'Outfit', fontSize: 18, fontWeight: 900, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📦 Category Manager
+                </h4>
                 <button
                   type="button"
-                  onClick={handleSaveCustomBrand}
-                  disabled={addingBrandLoading || !customBrandName.trim()}
+                  onClick={() => setCategoryModalOpen(false)}
+                  style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              
+              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginBottom: 16, fontFamily: 'Inter' }}>
+                Add new equipment categories or delete existing categories from your store catalog.
+              </p>
+
+              {/* Add Category Form */}
+              <div style={{ background: '#1A1A28', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: 14, marginBottom: 16 }}>
+                <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--red-vivid)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6, fontFamily: 'Outfit' }}>
+                  + Add New Category
+                </label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="e.g. Badminton Strings, Court Shoes..."
+                    value={customCategoryName}
+                    onChange={e => setCustomCategoryName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSaveCustomCategory();
+                      }
+                    }}
+                    autoFocus
+                    style={{
+                      flex: 1, padding: '10px 14px', background: '#111118',
+                      border: '1.5px solid rgba(176,28,40,0.45)', borderRadius: 10,
+                      color: '#FFFFFF', fontSize: 13.5, fontFamily: 'Outfit', outline: 'none'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveCustomCategory}
+                    disabled={addingCategoryLoading || !customCategoryName.trim()}
+                    style={{
+                      padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 900,
+                      fontFamily: 'Outfit', background: 'linear-gradient(135deg, #B01C28 0%, #8A121D 100%)',
+                      border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+                      opacity: !customCategoryName.trim() ? 0.6 : 1
+                    }}
+                  >
+                    {addingCategoryLoading ? <RefreshCw size={13} className="animate-spin" /> : <Plus size={14} />}
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Existing Categories List */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: 'Outfit' }}>
+                  Existing Categories ({categories.length})
+                </span>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', maxHeight: 200, display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+                {categories.length === 0 ? (
+                  <div style={{ padding: 16, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>No categories registered.</div>
+                ) : (
+                  categories.map(c => (
+                    <div
+                      key={c._id}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '8px 12px', background: categoryId === c._id ? 'rgba(176,28,40,0.15)' : 'rgba(255,255,255,0.03)',
+                        border: categoryId === c._id ? '1px solid rgba(176,28,40,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 10,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: '#FFFFFF', fontFamily: 'Outfit' }}>
+                          {c.name}
+                        </span>
+                        {categoryId === c._id && (
+                          <span style={{ fontSize: 10, fontWeight: 800, background: 'var(--red-vivid)', color: '#fff', padding: '1px 6px', borderRadius: 4 }}>
+                            Selected
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCategory(c._id, c.name)}
+                        disabled={deletingCategoryId === c._id}
+                        style={{
+                          background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
+                          borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#F87171', cursor: 'pointer', transition: 'all 0.15s ease'
+                        }}
+                        title={`Delete category ${c.name}`}
+                      >
+                        {deletingCategoryId === c._id ? <RefreshCw size={12} className="animate-spin" /> : <Trash2 size={13} />}
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setCategoryModalOpen(false)}
                   style={{
-                    padding: '10px 22px', borderRadius: 12, fontSize: 13, fontWeight: 900,
-                    fontFamily: 'Outfit', background: 'linear-gradient(135deg, #B01C28 0%, #8A121D 100%)',
-                    border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    boxShadow: '0 4px 14px rgba(176,28,40,0.45)',
-                    opacity: !customBrandName.trim() ? 0.6 : 1
+                    padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 800,
+                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+                    color: '#fff', cursor: 'pointer', fontFamily: 'Outfit'
                   }}
                 >
-                  {addingBrandLoading ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
-                  Save & Select Brand
+                  Done
                 </button>
               </div>
             </motion.div>

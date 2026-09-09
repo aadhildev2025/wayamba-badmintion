@@ -132,6 +132,16 @@ export default function Shop() {
   const [priceMax, setPriceMax]     = useState('');
   const [inStockOnly, setInStockOnly] = useState(false);
 
+  // Sync state when URL searchParams change
+  useEffect(() => {
+    const catParam = searchParams.get('category') ?? '';
+    const brandParam = searchParams.get('brand') ?? '';
+    const searchParam = searchParams.get('search') ?? '';
+    setSelCategory(catParam);
+    setSelBrand(brandParam);
+    setSearch(searchParam);
+  }, [searchParams]);
+
   useEffect(() => {
     setLoading(true);
     Promise.all([
@@ -151,19 +161,60 @@ export default function Shop() {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleSelectCategory = (catName: string) => {
+    const target = catName === 'All Categories' ? '' : catName;
+    setSelCategory(target);
+    const newParams = new URLSearchParams(searchParams);
+    if (target) {
+      newParams.set('category', target);
+    } else {
+      newParams.delete('category');
+    }
+    setSearchParams(newParams, { replace: true });
+  };
+
+  const handleSelectBrand = (brandName: string) => {
+    const target = brandName === 'All Brands' ? '' : brandName;
+    setSelBrand(target);
+    const newParams = new URLSearchParams(searchParams);
+    if (target) {
+      newParams.set('brand', target);
+    } else {
+      newParams.delete('brand');
+    }
+    setSearchParams(newParams, { replace: true });
+  };
+
   const applyFilters = useCallback(() => {
     let res = [...products];
-    if (search) {
-      const q = search.toLowerCase();
-      res = res.filter(p => p.name.toLowerCase().includes(q) || p.brand?.name?.toLowerCase().includes(q) || p.category?.name?.toLowerCase().includes(q));
+    if (search && search.trim()) {
+      const q = search.toLowerCase().trim();
+      res = res.filter(p => {
+        const pName = (p.name || '').toLowerCase();
+        const brandObj: any = p.brand;
+        const bName = (typeof brandObj === 'object' ? brandObj?.name : (typeof brandObj === 'string' ? brandObj : ''))?.toLowerCase() || '';
+        const catObj: any = p.category;
+        const cName = (typeof catObj === 'object' ? catObj?.name : (typeof catObj === 'string' ? catObj : ''))?.toLowerCase() || '';
+        return pName.includes(q) || bName.includes(q) || cName.includes(q);
+      });
     }
-    if (selCategory) {
-      const cq = selCategory.toLowerCase();
-      res = res.filter(p => p.category?.name?.toLowerCase() === cq || p.category?._id === selCategory);
+    if (selCategory && selCategory !== 'All Categories' && selCategory !== 'all') {
+      const cq = selCategory.toLowerCase().trim();
+      res = res.filter(p => {
+        const catObj: any = p.category;
+        const catName = (typeof catObj === 'object' ? catObj?.name : (typeof catObj === 'string' ? catObj : ''))?.toLowerCase()?.trim() || '';
+        const catId = typeof catObj === 'object' ? catObj?._id : (typeof catObj === 'string' ? catObj : '');
+        return catName === cq || catId === selCategory;
+      });
     }
-    if (selBrand) {
-      const bq = selBrand.toLowerCase();
-      res = res.filter(p => p.brand?.name?.toLowerCase() === bq || p.brand?._id === selBrand);
+    if (selBrand && selBrand !== 'All Brands' && selBrand !== 'all') {
+      const bq = selBrand.toLowerCase().trim();
+      res = res.filter(p => {
+        const brandObj: any = p.brand;
+        const bName = (typeof brandObj === 'object' ? brandObj?.name : (typeof brandObj === 'string' ? brandObj : ''))?.toLowerCase()?.trim() || '';
+        const bId = typeof brandObj === 'object' ? brandObj?._id : (typeof brandObj === 'string' ? brandObj : '');
+        return bName === bq || bId === selBrand;
+      });
     }
     if (priceMin) res = res.filter(p => (p.salePrice ?? p.price) >= Number(priceMin));
     if (priceMax) res = res.filter(p => (p.salePrice ?? p.price) <= Number(priceMax));
@@ -182,7 +233,7 @@ export default function Shop() {
   const clearFilters = () => {
     setSearch(''); setSelCategory(''); setSelBrand('');
     setPriceMin(''); setPriceMax(''); setInStockOnly(false); setSortBy('newest');
-    setSearchParams({});
+    setSearchParams({}, { replace: true });
   };
   const hasFilters = search || selCategory || selBrand || priceMin || priceMax || inStockOnly;
 
@@ -222,13 +273,27 @@ export default function Shop() {
             <div style={{ position: 'relative', flex: '0 0 auto', minWidth: 320 }}>
               <Search size={17} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--t3)', pointerEvents: 'none' }} />
               <input
-                value={search} onChange={e => setSearch(e.target.value)}
+                value={search} onChange={e => {
+                  setSearch(e.target.value);
+                  const newParams = new URLSearchParams(searchParams);
+                  if (e.target.value.trim()) {
+                    newParams.set('search', e.target.value.trim());
+                  } else {
+                    newParams.delete('search');
+                  }
+                  setSearchParams(newParams, { replace: true });
+                }}
                 placeholder="Search rackets, shoes, shuttlecocks…"
                 className="input"
                 style={{ paddingLeft: 46, paddingRight: search ? 40 : 16 }}
               />
               {search && (
-                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer' }}>
+                <button onClick={() => {
+                  setSearch('');
+                  const newParams = new URLSearchParams(searchParams);
+                  newParams.delete('search');
+                  setSearchParams(newParams, { replace: true });
+                }} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer' }}>
                   <X size={15} />
                 </button>
               )}
@@ -254,9 +319,9 @@ export default function Shop() {
             <FilterBlock title="Category">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {[{ _id: '', name: 'All Categories' }, ...categories].map(c => {
-                  const active = c._id === '' ? !selCategory : selCategory === c.name;
+                  const active = c._id === '' ? (!selCategory || selCategory === 'All Categories') : (selCategory === c.name || selCategory === c._id);
                   return (
-                    <button key={c._id} onClick={() => setSelCategory(c._id === '' ? '' : c.name)} style={filterBtnStyle(active)}>
+                    <button key={c._id} onClick={() => handleSelectCategory(c._id === '' ? '' : c.name)} style={filterBtnStyle(active)}>
                       {c.name}
                     </button>
                   );
@@ -268,9 +333,9 @@ export default function Shop() {
             <FilterBlock title="Brand">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {[{ _id: '', name: 'All Brands' }, ...brands].map(b => {
-                  const active = b._id === '' ? !selBrand : selBrand === b.name;
+                  const active = b._id === '' ? (!selBrand || selBrand === 'All Brands') : (selBrand === b.name || selBrand === b._id);
                   return (
-                    <button key={b._id} onClick={() => setSelBrand(b._id === '' ? '' : b.name)} style={filterBtnStyle(active)}>
+                    <button key={b._id} onClick={() => handleSelectBrand(b._id === '' ? '' : b.name)} style={filterBtnStyle(active)}>
                       {b.name}
                     </button>
                   );
@@ -294,63 +359,74 @@ export default function Shop() {
             </label>
           </aside>
 
-          {/* ── MAIN CONTENT ── */}
+          {/* ── PRODUCTS SECTION ── */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Toolbar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 14 }}>
+
+            {/* Controls Bar */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              flexWrap: 'wrap', gap: 14, marginBottom: 24, paddingBottom: 16,
+              borderBottom: '1px solid var(--b1)',
+            }}>
+              {/* Mobile Filter Toggle */}
               <button
                 onClick={() => setFiltersOpen(true)}
-                className="btn btn-outline btn-sm show-mobile"
-                style={{ display: 'none' }}
+                className="hidden-desktop btn btn-outline btn-sm"
+                style={{ gap: 8 }}
               >
                 <SlidersHorizontal size={14} /> Filters {hasFilters ? `(${[search,selCategory,selBrand,priceMin,priceMax,inStockOnly].filter(Boolean).length})` : ''}
               </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
-                <span style={{ fontFamily: 'Outfit', fontSize: 13, color: 'var(--t3)', fontWeight: 600 }}>Sort:</span>
-                <div style={{ position: 'relative' }}>
-                  <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{
-                    appearance: 'none', padding: '9px 36px 9px 14px',
-                    background: 'var(--bg-4)', border: '1.5px solid var(--bs)',
-                    borderRadius: 11, color: 'var(--t1)', fontSize: 13.5,
-                    outline: 'none', cursor: 'pointer',
-                    fontFamily: 'Outfit', fontWeight: 700,
-                  }}>
-                    {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                  <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--t3)', pointerEvents: 'none' }} />
-                </div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {(['grid', 'list'] as const).map(mode => (
-                    <button key={mode} onClick={() => setViewMode(mode)} style={{
-                      width: 38, height: 38, borderRadius: 10,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: viewMode === mode ? 'var(--red-vivid)' : 'var(--bg-4)',
-                      color: viewMode === mode ? '#FFFFFF' : 'var(--t3)',
-                      border: `1.5px solid ${viewMode === mode ? 'var(--red-vivid)' : 'var(--bs)'}`,
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }}>
-                      {mode === 'grid' ? <Grid3X3 size={15} /> : <List size={15} />}
-                    </button>
-                  ))}
+              {/* Active Filter Chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', flex: 1 }}>
+                {selCategory && <Chip label={`Category: ${selCategory}`} onRemove={() => handleSelectCategory('')} />}
+                {selBrand && <Chip label={`Brand: ${selBrand}`} onRemove={() => handleSelectBrand('')} />}
+                {priceMin && <Chip label={`Min: Rs. ${Number(priceMin).toLocaleString()}`} onRemove={() => setPriceMin('')} />}
+                {priceMax && <Chip label={`Max: Rs. ${Number(priceMax).toLocaleString()}`} onRemove={() => setPriceMax('')} />}
+                {inStockOnly && <Chip label="In Stock Only" onRemove={() => setInStockOnly(false)} />}
+              </div>
+
+              {/* View / Sort */}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginLeft: 'auto' }}>
+                <select
+                  value={sortBy} onChange={e => setSortBy(e.target.value)}
+                  className="input"
+                  style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}
+                >
+                  {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+
+                <div style={{ display: 'flex', borderRadius: 10, border: '1px solid var(--b1)', overflow: 'hidden' }}>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    style={{
+                      padding: '8px 11px', background: viewMode === 'grid' ? 'var(--red-vivid)' : 'var(--bg-3)',
+                      color: viewMode === 'grid' ? '#fff' : 'var(--t3)', border: 'none', cursor: 'pointer',
+                    }}
+                  ><Grid3X3 size={16} /></button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    style={{
+                      padding: '8px 11px', background: viewMode === 'list' ? 'var(--red-vivid)' : 'var(--bg-3)',
+                      color: viewMode === 'list' ? '#fff' : 'var(--t3)', border: 'none', cursor: 'pointer',
+                    }}
+                  ><List size={16} /></button>
                 </div>
               </div>
             </div>
 
-            {/* Active filter chips */}
-            {hasFilters && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
-                {selCategory && <Chip label={`Category: ${selCategory}`} onRemove={() => setSelCategory('')} />}
-                {selBrand    && <Chip label={`Brand: ${selBrand}`}       onRemove={() => setSelBrand('')} />}
-                {priceMin    && <Chip label={`Min: Rs. ${priceMin}`}     onRemove={() => setPriceMin('')} />}
-                {priceMax    && <Chip label={`Max: Rs. ${priceMax}`}     onRemove={() => setPriceMax('')} />}
-                {inStockOnly && <Chip label="In Stock Only"              onRemove={() => setInStockOnly(false)} />}
+            {/* Product Listing */}
+            {loading ? (
+              <div style={{ padding: 80, textAlign: 'center' }}>
+                <div className="spinner" style={{ margin: '0 auto 16px' }} />
+                <p style={{ color: 'var(--t3)', fontSize: 14 }}>Fetching catalog products…</p>
               </div>
-            )}
-
-            {/* Product listing */}
-            {filtered.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '100px 0', color: 'var(--t3)' }}>
+            ) : filtered.length === 0 ? (
+              <div style={{
+                textAlign: 'center', padding: '72px 24px',
+                borderRadius: 20, border: '1px dashed var(--b1)', background: 'var(--bg-2)',
+                color: 'var(--t3)',
+              }}>
                 <Package size={56} style={{ opacity: 0.18, margin: '0 auto 18px' }} />
                 <h3 style={{ fontFamily: 'Outfit', fontSize: 24, color: 'var(--t2)', marginBottom: 10 }}>No equipment matches your filters</h3>
                 <p style={{ fontSize: 14 }}>Try adjusting your search criteria or resetting filters.</p>
@@ -400,10 +476,23 @@ export default function Shop() {
                 <FilterBlock title="Category">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {[{ _id: '', name: 'All Categories' }, ...categories].map(c => {
-                      const active = c._id === '' ? !selCategory : selCategory === c.name;
+                      const active = c._id === '' ? (!selCategory || selCategory === 'All Categories') : (selCategory === c.name || selCategory === c._id);
                       return (
-                        <button key={c._id} onClick={() => { setSelCategory(c._id === '' ? '' : c.name); setFiltersOpen(false); }} style={filterBtnStyle(active)}>
+                        <button key={c._id} onClick={() => { handleSelectCategory(c._id === '' ? '' : c.name); setFiltersOpen(false); }} style={filterBtnStyle(active)}>
                           {c.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </FilterBlock>
+
+                <FilterBlock title="Brand">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {[{ _id: '', name: 'All Brands' }, ...brands].map(b => {
+                      const active = b._id === '' ? (!selBrand || selBrand === 'All Brands') : (selBrand === b.name || selBrand === b._id);
+                      return (
+                        <button key={b._id} onClick={() => { handleSelectBrand(b._id === '' ? '' : b.name); setFiltersOpen(false); }} style={filterBtnStyle(active)}>
+                          {b.name}
                         </button>
                       );
                     })}
@@ -418,4 +507,3 @@ export default function Shop() {
     </div>
   );
 }
-

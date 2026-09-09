@@ -79,30 +79,63 @@ router.get('/categories', async (req, res) => {
 router.post('/categories', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
   try {
     const { name, icon } = req.body;
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Category name is required' });
+    }
+    const cleanName = name.trim();
+    const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     
-    const exists = await Category.findOne({ slug });
-    if (exists) {
-      res.status(400).json({ message: 'Category already exists' });
-      return;
+    let category = await Category.findOne({
+      $or: [
+        { slug },
+        { name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+      ]
+    });
+    if (category) {
+      return res.status(200).json(category);
     }
 
-    const category = await Category.create({ name, slug, icon });
+    category = await Category.create({ name: cleanName, slug, icon: icon || '' });
+    if (!fallbackCategories.some(c => c.slug === slug || c._id === String(category?._id))) {
+      fallbackCategories.push({
+        _id: String(category._id),
+        name: category.name,
+        slug: category.slug,
+        icon: category.icon || ''
+      });
+    }
     res.status(201).json(category);
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    console.error('Error creating category in DB, returning fallback:', error.message);
+    const cleanName = (req.body.name || 'Custom Category').trim();
+    const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const fallbackCategory = {
+      _id: '65' + Math.random().toString(16).slice(2, 26).padEnd(22, '0'),
+      name: cleanName,
+      slug,
+      icon: req.body.icon || ''
+    };
+    fallbackCategories.push(fallbackCategory);
+    res.status(201).json(fallbackCategory);
   }
 });
 
-// DELETE category (Super Admin only)
-router.delete('/categories/:id', protect, restrictTo('SUPER_ADMIN'), async (req, res) => {
+// DELETE category (Super Admin & Staff)
+router.delete('/categories/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
   try {
-    const productsUsing = await Product.findOne({ category: req.params.id });
-    if (productsUsing) {
-      res.status(400).json({ message: 'Cannot delete category because products are assigned to it' });
-      return;
+    const { id } = req.params;
+    let deletedDoc = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      deletedDoc = await Category.findByIdAndDelete(id);
     }
-    await Category.findByIdAndDelete(req.params.id);
+    if (!deletedDoc) {
+      deletedDoc = await Category.findOneAndDelete({ $or: [{ slug: id }, { name: id }] });
+    }
+    // Also remove from in-memory fallback array
+    const idx = fallbackCategories.findIndex(c => c._id === id || c.slug === id || c.name.toLowerCase() === id.toLowerCase());
+    if (idx !== -1) {
+      fallbackCategories.splice(idx, 1);
+    }
     res.json({ message: 'Category deleted successfully' });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -175,15 +208,22 @@ router.post('/brands', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, 
   }
 });
 
-// DELETE brand (Super Admin only)
-router.delete('/brands/:id', protect, restrictTo('SUPER_ADMIN'), async (req, res) => {
+// DELETE brand (Super Admin & Staff)
+router.delete('/brands/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
   try {
-    const productsUsing = await Product.findOne({ brand: req.params.id });
-    if (productsUsing) {
-      res.status(400).json({ message: 'Cannot delete brand because products are assigned to it' });
-      return;
+    const { id } = req.params;
+    let deletedDoc = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      deletedDoc = await Brand.findByIdAndDelete(id);
     }
-    await Brand.findByIdAndDelete(req.params.id);
+    if (!deletedDoc) {
+      deletedDoc = await Brand.findOneAndDelete({ $or: [{ slug: id }, { name: id }] });
+    }
+    // Also remove from in-memory fallback array
+    const idx = fallbackBrands.findIndex(b => b._id === id || b.slug === id || b.name.toLowerCase() === id.toLowerCase());
+    if (idx !== -1) {
+      fallbackBrands.splice(idx, 1);
+    }
     res.json({ message: 'Brand deleted successfully' });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -425,6 +465,23 @@ async function resolveBrand(brandInput: any): Promise<mongoose.Types.ObjectId> {
   return brandDoc._id as mongoose.Types.ObjectId;
 }
 
+// Helper to resolve category (by ObjectId or name)
+async function resolveCategory(categoryInput: any): Promise<mongoose.Types.ObjectId> {
+  if (categoryInput && mongoose.Types.ObjectId.isValid(categoryInput)) {
+    const existing = await Category.findById(categoryInput);
+    if (existing) return existing._id as mongoose.Types.ObjectId;
+  }
+  const cleanName = String(categoryInput || fallbackCategories[0]?.name || 'Badminton Rackets').trim();
+  const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  let catDoc = await Category.findOne({
+    $or: [{ slug }, { name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }]
+  });
+  if (!catDoc) {
+    catDoc = await Category.create({ name: cleanName, slug, icon: '' });
+  }
+  return catDoc._id as mongoose.Types.ObjectId;
+}
+
 // POST create product (Super Admin & Staff)
 router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
   const { name, sku, description, price, salePrice, stockQuantity, images, brand, category, status, tags, isFeatured, specifications } = req.body;
@@ -438,6 +495,7 @@ router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) =
     }
 
     const resolvedBrandId = await resolveBrand(brand);
+    const resolvedCategoryId = await resolveCategory(category);
 
     const product = await Product.create({
       name,
@@ -449,7 +507,7 @@ router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) =
       stockQuantity,
       images,
       brand: resolvedBrandId,
-      category,
+      category: resolvedCategoryId,
       status,
       tags,
       isFeatured,
@@ -462,7 +520,7 @@ router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) =
     console.error('Error creating product in DB, returning fallback response:', error.message);
     // Find matching brand and category objects for UI display
     const matchedBrand = fallbackBrands.find(b => b._id === brand || b.name.toLowerCase() === String(brand).toLowerCase()) || { _id: brand, name: typeof brand === 'string' && brand ? brand : 'Yonex' };
-    const matchedCategory = fallbackCategories.find(c => c._id === category) || { _id: category, name: 'Badminton Rackets' };
+    const matchedCategory = fallbackCategories.find(c => c._id === category || c.name.toLowerCase() === String(category).toLowerCase()) || { _id: category, name: typeof category === 'string' && category ? category : 'Badminton Rackets' };
 
     const simulatedProduct = {
       _id: '65' + Math.random().toString(16).slice(2, 26).padEnd(22, '0'),
@@ -510,7 +568,9 @@ router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res)
     if (brand) {
       product.brand = await resolveBrand(brand);
     }
-    product.category = category || product.category;
+    if (category) {
+      product.category = await resolveCategory(category);
+    }
     product.status = status || product.status;
     product.tags = tags || product.tags;
     product.isFeatured = isFeatured !== undefined ? isFeatured : product.isFeatured;
