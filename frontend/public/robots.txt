@@ -4,4 +4,4 @@ Disallow: /admin/
 Disallow: /checkout
 Disallow: /order-confirmation
 
-Sitemap: https://www.wayambabadminton.com/sitemap.xml
+Sitemap: https://www.wayamba-badmintion-home.com/sitemap.xml
