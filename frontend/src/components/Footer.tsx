@@ -126,7 +126,7 @@ export default function Footer() {
             <h4 style={{ fontFamily: 'Outfit', fontWeight: 800, fontSize: 15, color: '#fff', marginBottom: 20, letterSpacing: 0.3 }}>Store Location</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {[
-                { Icon: MapPin, content: 'D22, Bus Stand Complex, Puttalam, Sri Lanka', href: 'https://maps.google.com/?q=D22+Bus+Stand+Complex+Puttalam' },
+                { Icon: MapPin, content: 'D21, Bus Stand Complex, Puttalam, Sri Lanka', href: 'https://maps.google.com/?q=D21+Bus+Stand+Complex+Puttalam' },
                 { Icon: Phone,  content: '+94 71 444 3317', href: 'tel:+94714443317' },
                 { Icon: Mail,   content: 'info@wayambabadminton.com', href: 'mailto:info@wayambabadminton.com' },
               ].map(({ Icon, content, href }) => (

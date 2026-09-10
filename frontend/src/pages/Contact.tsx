@@ -33,7 +33,7 @@ export default function Contact() {
   };
 
   const CONTACT_INFO = [
-    { icon: MapPin, title: 'Store Address', lines: ['Wayamba Badminton Home', 'D22, Bus Stand Complex', 'Puttalam, Sri Lanka'] },
+    { icon: MapPin, title: 'Store Address', lines: ['Wayamba Badminton Home', 'D21, Bus Stand Complex', 'Puttalam, Sri Lanka'] },
     { icon: Phone, title: 'Call / WhatsApp', lines: ['+94 71 444 3317', '+94 37 222 1100'] },
     { icon: Mail, title: 'Direct Email', lines: ['info@wayambabadminton.com', 'support@wayambabadminton.com'] },
     { icon: Clock, title: 'Store Opening Hours', lines: ['Mon–Sat: 8:30 AM – 7:30 PM', 'Sunday: 9:00 AM – 5:00 PM'] },
