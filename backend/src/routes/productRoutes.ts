@@ -58,6 +58,34 @@ export const fallbackProducts = [
       { key: 'Max Tension', value: '28 lbs' },
     ],
   },
+  {
+    _id: '650000000000000000000031',
+    name: 'Yonex Aerosensa 50 Feather Shuttlecocks',
+    slug: 'yonex-aerosensa-50-feather-shuttlecocks',
+    sku: 'YNX-AS-50-TUBE',
+    description: 'Official tournament grade BWF-approved feather shuttlecocks. Crafted from selected premium goose feathers with 100% natural solid cork for precision trajectory and flight consistency.',
+    price: 850,
+    salePrice: 800,
+    hasCasePricing: true,
+    piecePrice: 850,
+    pieceSalePrice: 800,
+    casePrice: 9500,
+    caseSalePrice: 8900,
+    caseUnitsCount: 12,
+    stockQuantity: 45,
+    images: ['/imgs/hero_shuttlecock.png'],
+    brand: fallbackBrands[0],
+    category: fallbackCategories[2],
+    status: 'active',
+    tags: ['shuttlecock', 'feather', 'yonex', 'tournament', 'as50', 'badminton'],
+    isFeatured: true,
+    specifications: [
+      { key: 'Feather Type', value: 'Grade A Premium Goose Feathers' },
+      { key: 'Cork Base', value: '100% Natural 3-Layer Solid Cork' },
+      { key: 'Speed', value: 'Speed 77 (Medium Fast / Court standard)' },
+      { key: 'Packaging', value: 'Single Piece or 1 Tube (12 Shuttlecocks)' },
+    ],
+  },
 ];
 
 // ==========================================
@@ -101,7 +129,8 @@ router.post('/categories', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (r
         _id: String(category._id),
         name: category.name,
         slug: category.slug,
-        icon: category.icon || ''
+        icon: category.icon || '',
+        image: '/imgs/cat_badminton_rackets.png'
       });
     }
     res.status(201).json(category);
@@ -113,7 +142,8 @@ router.post('/categories', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (r
       _id: '65' + Math.random().toString(16).slice(2, 26).padEnd(22, '0'),
       name: cleanName,
       slug,
-      icon: req.body.icon || ''
+      icon: req.body.icon || '',
+      image: '/imgs/cat_badminton_rackets.png'
     };
     fallbackCategories.push(fallbackCategory);
     res.status(201).json(fallbackCategory);
@@ -484,7 +514,12 @@ async function resolveCategory(categoryInput: any): Promise<mongoose.Types.Objec
 
 // POST create product (Super Admin & Staff)
 router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
-  const { name, sku, description, price, salePrice, stockQuantity, images, brand, category, status, tags, isFeatured, specifications } = req.body;
+  const {
+    name, sku, description, price, salePrice,
+    hasCasePricing, casePrice, caseSalePrice, caseUnitsCount, piecePrice, pieceSalePrice,
+    hasColors, colors,
+    stockQuantity, images, brand, category, status, tags, isFeatured, specifications
+  } = req.body;
   const slug = (name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
 
   try {
@@ -504,6 +539,14 @@ router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) =
       description,
       price,
       salePrice,
+      hasCasePricing: Boolean(hasCasePricing),
+      casePrice: casePrice !== undefined && casePrice !== '' ? Number(casePrice) : undefined,
+      caseSalePrice: caseSalePrice !== undefined && caseSalePrice !== '' ? Number(caseSalePrice) : undefined,
+      caseUnitsCount: caseUnitsCount !== undefined && caseUnitsCount !== '' ? Number(caseUnitsCount) : 12,
+      piecePrice: piecePrice !== undefined && piecePrice !== '' ? Number(piecePrice) : Number(price),
+      pieceSalePrice: pieceSalePrice !== undefined && pieceSalePrice !== '' ? Number(pieceSalePrice) : (salePrice ? Number(salePrice) : undefined),
+      hasColors: Boolean(hasColors),
+      colors: Array.isArray(colors) ? colors : (typeof colors === 'string' && colors ? colors.split(',').map((c: string) => c.trim()).filter(Boolean) : []),
       stockQuantity,
       images,
       brand: resolvedBrandId,
@@ -530,6 +573,14 @@ router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) =
       description: description || '',
       price: Number(price) || 0,
       salePrice: salePrice ? Number(salePrice) : undefined,
+      hasCasePricing: Boolean(hasCasePricing),
+      casePrice: casePrice ? Number(casePrice) : undefined,
+      caseSalePrice: caseSalePrice ? Number(caseSalePrice) : undefined,
+      caseUnitsCount: caseUnitsCount ? Number(caseUnitsCount) : 12,
+      piecePrice: piecePrice ? Number(piecePrice) : Number(price),
+      pieceSalePrice: pieceSalePrice ? Number(pieceSalePrice) : (salePrice ? Number(salePrice) : undefined),
+      hasColors: Boolean(hasColors),
+      colors: Array.isArray(colors) ? colors : [],
       stockQuantity: Number(stockQuantity) || 0,
       images: Array.isArray(images) && images.length > 0 ? images : ['/imgs/hero_rackets.png'],
       brand: matchedBrand,
@@ -552,7 +603,12 @@ router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res)
       return;
     }
 
-    const { name, sku, description, price, salePrice, stockQuantity, images, brand, category, status, tags, isFeatured, specifications } = req.body;
+    const {
+      name, sku, description, price, salePrice,
+      hasCasePricing, casePrice, caseSalePrice, caseUnitsCount, piecePrice, pieceSalePrice,
+      hasColors, colors,
+      stockQuantity, images, brand, category, status, tags, isFeatured, specifications
+    } = req.body;
 
     if (name && name !== product.name) {
       product.name = name;
@@ -563,6 +619,16 @@ router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res)
     product.description = description !== undefined ? description : product.description;
     product.price = price !== undefined ? price : product.price;
     product.salePrice = salePrice !== undefined ? salePrice : product.salePrice;
+    product.hasCasePricing = hasCasePricing !== undefined ? Boolean(hasCasePricing) : product.hasCasePricing;
+    product.casePrice = casePrice !== undefined && casePrice !== '' ? Number(casePrice) : undefined;
+    product.caseSalePrice = caseSalePrice !== undefined && caseSalePrice !== '' ? Number(caseSalePrice) : undefined;
+    product.caseUnitsCount = caseUnitsCount !== undefined && caseUnitsCount !== '' ? Number(caseUnitsCount) : (product.caseUnitsCount || 12);
+    product.piecePrice = piecePrice !== undefined && piecePrice !== '' ? Number(piecePrice) : (product.piecePrice || Number(price));
+    product.pieceSalePrice = pieceSalePrice !== undefined && pieceSalePrice !== '' ? Number(pieceSalePrice) : undefined;
+    product.hasColors = hasColors !== undefined ? Boolean(hasColors) : product.hasColors;
+    if (colors !== undefined) {
+      product.colors = Array.isArray(colors) ? colors : (typeof colors === 'string' && colors ? colors.split(',').map((c: string) => c.trim()).filter(Boolean) : []);
+    }
     product.stockQuantity = stockQuantity !== undefined ? stockQuantity : product.stockQuantity;
     product.images = images || product.images;
     if (brand) {

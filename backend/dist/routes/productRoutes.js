@@ -60,6 +60,34 @@ exports.fallbackProducts = [
             { key: 'Max Tension', value: '28 lbs' },
         ],
     },
+    {
+        _id: '650000000000000000000031',
+        name: 'Yonex Aerosensa 50 Feather Shuttlecocks',
+        slug: 'yonex-aerosensa-50-feather-shuttlecocks',
+        sku: 'YNX-AS-50-TUBE',
+        description: 'Official tournament grade BWF-approved feather shuttlecocks. Crafted from selected premium goose feathers with 100% natural solid cork for precision trajectory and flight consistency.',
+        price: 850,
+        salePrice: 800,
+        hasCasePricing: true,
+        piecePrice: 850,
+        pieceSalePrice: 800,
+        casePrice: 9500,
+        caseSalePrice: 8900,
+        caseUnitsCount: 12,
+        stockQuantity: 45,
+        images: ['/imgs/hero_shuttlecock.png'],
+        brand: exports.fallbackBrands[0],
+        category: exports.fallbackCategories[2],
+        status: 'active',
+        tags: ['shuttlecock', 'feather', 'yonex', 'tournament', 'as50', 'badminton'],
+        isFeatured: true,
+        specifications: [
+            { key: 'Feather Type', value: 'Grade A Premium Goose Feathers' },
+            { key: 'Cork Base', value: '100% Natural 3-Layer Solid Cork' },
+            { key: 'Speed', value: 'Speed 77 (Medium Fast / Court standard)' },
+            { key: 'Packaging', value: 'Single Piece or 1 Tube (12 Shuttlecocks)' },
+        ],
+    },
 ];
 // ==========================================
 // CATEGORY ENDPOINTS
@@ -79,28 +107,63 @@ router.get('/categories', async (req, res) => {
 router.post('/categories', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
     try {
         const { name, icon } = req.body;
-        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-        const exists = await Category_1.default.findOne({ slug });
-        if (exists) {
-            res.status(400).json({ message: 'Category already exists' });
-            return;
+        if (!name || !name.trim()) {
+            return res.status(400).json({ message: 'Category name is required' });
         }
-        const category = await Category_1.default.create({ name, slug, icon });
+        const cleanName = name.trim();
+        const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        let category = await Category_1.default.findOne({
+            $or: [
+                { slug },
+                { name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+            ]
+        });
+        if (category) {
+            return res.status(200).json(category);
+        }
+        category = await Category_1.default.create({ name: cleanName, slug, icon: icon || '' });
+        if (!exports.fallbackCategories.some(c => c.slug === slug || c._id === String(category?._id))) {
+            exports.fallbackCategories.push({
+                _id: String(category._id),
+                name: category.name,
+                slug: category.slug,
+                icon: category.icon || '',
+                image: '/imgs/cat_badminton_rackets.png'
+            });
+        }
         res.status(201).json(category);
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error creating category in DB, returning fallback:', error.message);
+        const cleanName = (req.body.name || 'Custom Category').trim();
+        const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        const fallbackCategory = {
+            _id: '65' + Math.random().toString(16).slice(2, 26).padEnd(22, '0'),
+            name: cleanName,
+            slug,
+            icon: req.body.icon || '',
+            image: '/imgs/cat_badminton_rackets.png'
+        };
+        exports.fallbackCategories.push(fallbackCategory);
+        res.status(201).json(fallbackCategory);
     }
 });
-// DELETE category (Super Admin only)
-router.delete('/categories/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN'), async (req, res) => {
+// DELETE category (Super Admin & Staff)
+router.delete('/categories/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
     try {
-        const productsUsing = await Product_1.default.findOne({ category: req.params.id });
-        if (productsUsing) {
-            res.status(400).json({ message: 'Cannot delete category because products are assigned to it' });
-            return;
+        const { id } = req.params;
+        let deletedDoc = null;
+        if (mongoose_1.default.Types.ObjectId.isValid(id)) {
+            deletedDoc = await Category_1.default.findByIdAndDelete(id);
         }
-        await Category_1.default.findByIdAndDelete(req.params.id);
+        if (!deletedDoc) {
+            deletedDoc = await Category_1.default.findOneAndDelete({ $or: [{ slug: id }, { name: id }] });
+        }
+        // Also remove from in-memory fallback array
+        const idx = exports.fallbackCategories.findIndex(c => c._id === id || c.slug === id || c.name.toLowerCase() === id.toLowerCase());
+        if (idx !== -1) {
+            exports.fallbackCategories.splice(idx, 1);
+        }
         res.json({ message: 'Category deleted successfully' });
     }
     catch (error) {
@@ -166,15 +229,22 @@ router.post('/brands', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo
         res.status(201).json(fallbackBrand);
     }
 });
-// DELETE brand (Super Admin only)
-router.delete('/brands/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN'), async (req, res) => {
+// DELETE brand (Super Admin & Staff)
+router.delete('/brands/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
     try {
-        const productsUsing = await Product_1.default.findOne({ brand: req.params.id });
-        if (productsUsing) {
-            res.status(400).json({ message: 'Cannot delete brand because products are assigned to it' });
-            return;
+        const { id } = req.params;
+        let deletedDoc = null;
+        if (mongoose_1.default.Types.ObjectId.isValid(id)) {
+            deletedDoc = await Brand_1.default.findByIdAndDelete(id);
         }
-        await Brand_1.default.findByIdAndDelete(req.params.id);
+        if (!deletedDoc) {
+            deletedDoc = await Brand_1.default.findOneAndDelete({ $or: [{ slug: id }, { name: id }] });
+        }
+        // Also remove from in-memory fallback array
+        const idx = exports.fallbackBrands.findIndex(b => b._id === id || b.slug === id || b.name.toLowerCase() === id.toLowerCase());
+        if (idx !== -1) {
+            exports.fallbackBrands.splice(idx, 1);
+        }
         res.json({ message: 'Brand deleted successfully' });
     }
     catch (error) {
@@ -320,7 +390,7 @@ router.get('/:idOrSlug/reviews', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
-// POST upload multiple images
+// POST upload multiple images (Cloudinary CDN with local/base64 fallback)
 router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (req, res) => {
     uploadMiddleware_1.upload.array('images', 10)(req, res, async (err) => {
         if (err) {
@@ -332,6 +402,23 @@ router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo
         }
         const files = req.files;
         try {
+            // 1. Primary: Upload to Cloudinary for permanent, high-speed CDN URLs
+            if ((0, uploadMiddleware_1.isCloudinaryReady)()) {
+                try {
+                    const uploadPromises = files.map(async (file) => {
+                        if (file.buffer) {
+                            return await (0, uploadMiddleware_1.uploadToCloudinary)(file.buffer, 'wayamba_products');
+                        }
+                        throw new Error('Missing file buffer for upload');
+                    });
+                    const urls = await Promise.all(uploadPromises);
+                    return res.json({ urls, imageUrls: urls });
+                }
+                catch (cloudinaryErr) {
+                    console.error('Cloudinary upload failed, falling back:', cloudinaryErr);
+                }
+            }
+            // 2. Fallback: Local disk if available, or base64 data URI
             const publicUploadsDir = path_1.default.join(__dirname, '../../public/uploads');
             try {
                 if (!fs_1.default.existsSync(publicUploadsDir)) {
@@ -341,42 +428,25 @@ router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo
             catch (dirErr) {
                 console.warn('Upload directory check:', dirErr);
             }
-            const fileUrls = await Promise.all(files.map(async (file) => {
-                // 1. Try Cloudinary first if configured
-                if ((0, uploadMiddleware_1.isCloudinaryReady)() && file.buffer) {
-                    try {
-                        const cloudUrl = await (0, uploadMiddleware_1.uploadToCloudinary)(file.buffer);
-                        if (cloudUrl)
-                            return cloudUrl;
-                    }
-                    catch (cloudErr) {
-                        console.warn('Cloudinary upload error, falling back to local/data URL storage:', cloudErr.message || cloudErr);
-                    }
-                }
-                // 2. Fallback to saving to local public/uploads directory
+            const host = req.get('host') || 'localhost:5000';
+            const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+            const fileUrls = files.map((file) => {
                 if (file.buffer) {
                     try {
-                        const originalExt = path_1.default.extname(file.originalname) || '.webp';
+                        const originalExt = path_1.default.extname(file.originalname) || '.jpg';
                         const cleanExt = originalExt.startsWith('.') ? originalExt : `.${originalExt}`;
-                        const filename = `img-${Date.now()}-${Math.round(Math.random() * 1e9)}${cleanExt}`;
+                        const filename = `img-${Date.now()}-${Math.round(Math.random() * 1e8)}${cleanExt}`;
                         const filePath = path_1.default.join(publicUploadsDir, filename);
                         fs_1.default.writeFileSync(filePath, file.buffer);
-                        const host = req.get('host') || 'localhost:5000';
-                        const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
                         return `${protocol}://${host}/uploads/${filename}`;
                     }
                     catch (diskErr) {
-                        console.warn('Local disk write failed, fallback to base64 Data URL:', diskErr.message);
-                        // 3. Fallback to base64 data URL
-                        const mime = file.mimetype || 'image/webp';
+                        const mime = file.mimetype || 'image/jpeg';
                         return `data:${mime};base64,${file.buffer.toString('base64')}`;
                     }
                 }
-                // If file was stored by disk storage
-                const host = req.get('host') || 'localhost:5000';
-                const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
                 return `${protocol}://${host}/uploads/${file.filename}`;
-            }));
+            });
             return res.json({ urls: fileUrls, imageUrls: fileUrls });
         }
         catch (uploadError) {
@@ -403,9 +473,26 @@ async function resolveBrand(brandInput) {
     }
     return brandDoc._id;
 }
+// Helper to resolve category (by ObjectId or name)
+async function resolveCategory(categoryInput) {
+    if (categoryInput && mongoose_1.default.Types.ObjectId.isValid(categoryInput)) {
+        const existing = await Category_1.default.findById(categoryInput);
+        if (existing)
+            return existing._id;
+    }
+    const cleanName = String(categoryInput || exports.fallbackCategories[0]?.name || 'Badminton Rackets').trim();
+    const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    let catDoc = await Category_1.default.findOne({
+        $or: [{ slug }, { name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }]
+    });
+    if (!catDoc) {
+        catDoc = await Category_1.default.create({ name: cleanName, slug, icon: '' });
+    }
+    return catDoc._id;
+}
 // POST create product (Super Admin & Staff)
 router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
-    const { name, sku, description, price, salePrice, stockQuantity, images, brand, category, status, tags, isFeatured, specifications } = req.body;
+    const { name, sku, description, price, salePrice, hasCasePricing, casePrice, caseSalePrice, caseUnitsCount, piecePrice, pieceSalePrice, hasColors, colors, stockQuantity, images, brand, category, status, tags, isFeatured, specifications } = req.body;
     const slug = (name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
     try {
         const exists = await Product_1.default.findOne({ $or: [{ sku }, { slug }] });
@@ -414,6 +501,7 @@ router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUP
             return;
         }
         const resolvedBrandId = await resolveBrand(brand);
+        const resolvedCategoryId = await resolveCategory(category);
         const product = await Product_1.default.create({
             name,
             slug,
@@ -421,10 +509,18 @@ router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUP
             description,
             price,
             salePrice,
+            hasCasePricing: Boolean(hasCasePricing),
+            casePrice: casePrice !== undefined && casePrice !== '' ? Number(casePrice) : undefined,
+            caseSalePrice: caseSalePrice !== undefined && caseSalePrice !== '' ? Number(caseSalePrice) : undefined,
+            caseUnitsCount: caseUnitsCount !== undefined && caseUnitsCount !== '' ? Number(caseUnitsCount) : 12,
+            piecePrice: piecePrice !== undefined && piecePrice !== '' ? Number(piecePrice) : Number(price),
+            pieceSalePrice: pieceSalePrice !== undefined && pieceSalePrice !== '' ? Number(pieceSalePrice) : (salePrice ? Number(salePrice) : undefined),
+            hasColors: Boolean(hasColors),
+            colors: Array.isArray(colors) ? colors : (typeof colors === 'string' && colors ? colors.split(',').map((c) => c.trim()).filter(Boolean) : []),
             stockQuantity,
             images,
             brand: resolvedBrandId,
-            category,
+            category: resolvedCategoryId,
             status,
             tags,
             isFeatured,
@@ -437,7 +533,7 @@ router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUP
         console.error('Error creating product in DB, returning fallback response:', error.message);
         // Find matching brand and category objects for UI display
         const matchedBrand = exports.fallbackBrands.find(b => b._id === brand || b.name.toLowerCase() === String(brand).toLowerCase()) || { _id: brand, name: typeof brand === 'string' && brand ? brand : 'Yonex' };
-        const matchedCategory = exports.fallbackCategories.find(c => c._id === category) || { _id: category, name: 'Badminton Rackets' };
+        const matchedCategory = exports.fallbackCategories.find(c => c._id === category || c.name.toLowerCase() === String(category).toLowerCase()) || { _id: category, name: typeof category === 'string' && category ? category : 'Badminton Rackets' };
         const simulatedProduct = {
             _id: '65' + Math.random().toString(16).slice(2, 26).padEnd(22, '0'),
             name: name || 'New Badminton Product',
@@ -446,6 +542,14 @@ router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUP
             description: description || '',
             price: Number(price) || 0,
             salePrice: salePrice ? Number(salePrice) : undefined,
+            hasCasePricing: Boolean(hasCasePricing),
+            casePrice: casePrice ? Number(casePrice) : undefined,
+            caseSalePrice: caseSalePrice ? Number(caseSalePrice) : undefined,
+            caseUnitsCount: caseUnitsCount ? Number(caseUnitsCount) : 12,
+            piecePrice: piecePrice ? Number(piecePrice) : Number(price),
+            pieceSalePrice: pieceSalePrice ? Number(pieceSalePrice) : (salePrice ? Number(salePrice) : undefined),
+            hasColors: Boolean(hasColors),
+            colors: Array.isArray(colors) ? colors : [],
             stockQuantity: Number(stockQuantity) || 0,
             images: Array.isArray(images) && images.length > 0 ? images : ['/imgs/hero_rackets.png'],
             brand: matchedBrand,
@@ -466,7 +570,7 @@ router.put('/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('S
             res.json({ _id: req.params.id, ...req.body });
             return;
         }
-        const { name, sku, description, price, salePrice, stockQuantity, images, brand, category, status, tags, isFeatured, specifications } = req.body;
+        const { name, sku, description, price, salePrice, hasCasePricing, casePrice, caseSalePrice, caseUnitsCount, piecePrice, pieceSalePrice, hasColors, colors, stockQuantity, images, brand, category, status, tags, isFeatured, specifications } = req.body;
         if (name && name !== product.name) {
             product.name = name;
             product.slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
@@ -475,12 +579,24 @@ router.put('/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('S
         product.description = description !== undefined ? description : product.description;
         product.price = price !== undefined ? price : product.price;
         product.salePrice = salePrice !== undefined ? salePrice : product.salePrice;
+        product.hasCasePricing = hasCasePricing !== undefined ? Boolean(hasCasePricing) : product.hasCasePricing;
+        product.casePrice = casePrice !== undefined && casePrice !== '' ? Number(casePrice) : undefined;
+        product.caseSalePrice = caseSalePrice !== undefined && caseSalePrice !== '' ? Number(caseSalePrice) : undefined;
+        product.caseUnitsCount = caseUnitsCount !== undefined && caseUnitsCount !== '' ? Number(caseUnitsCount) : (product.caseUnitsCount || 12);
+        product.piecePrice = piecePrice !== undefined && piecePrice !== '' ? Number(piecePrice) : (product.piecePrice || Number(price));
+        product.pieceSalePrice = pieceSalePrice !== undefined && pieceSalePrice !== '' ? Number(pieceSalePrice) : undefined;
+        product.hasColors = hasColors !== undefined ? Boolean(hasColors) : product.hasColors;
+        if (colors !== undefined) {
+            product.colors = Array.isArray(colors) ? colors : (typeof colors === 'string' && colors ? colors.split(',').map((c) => c.trim()).filter(Boolean) : []);
+        }
         product.stockQuantity = stockQuantity !== undefined ? stockQuantity : product.stockQuantity;
         product.images = images || product.images;
         if (brand) {
             product.brand = await resolveBrand(brand);
         }
-        product.category = category || product.category;
+        if (category) {
+            product.category = await resolveCategory(category);
+        }
         product.status = status || product.status;
         product.tags = tags || product.tags;
         product.isFeatured = isFeatured !== undefined ? isFeatured : product.isFeatured;

@@ -12,6 +12,14 @@ interface ProductQuickViewProps {
     slug: string;
     price: number;
     salePrice?: number;
+    hasCasePricing?: boolean;
+    casePrice?: number;
+    caseSalePrice?: number;
+    caseUnitsCount?: number;
+    piecePrice?: number;
+    pieceSalePrice?: number;
+    hasColors?: boolean;
+    colors?: string[];
     images?: (string | { url: string })[];
     brand?: { name: string };
     category?: { name: string };
@@ -28,6 +36,8 @@ interface ProductQuickViewProps {
 export default function ProductQuickViewModal({ product, isOpen, onClose }: ProductQuickViewProps) {
   const { addToCart } = useCart();
   const navigate = useNavigate();
+  const [selectedUnit, setSelectedUnit] = useState<'piece' | 'case'>('piece');
+  const [selectedColor, setSelectedColor] = useState<string>(() => (product?.colors?.[0] || ''));
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [activeImgIdx, setActiveImgIdx] = useState(0);
@@ -40,20 +50,41 @@ export default function ProductQuickViewModal({ product, isOpen, onClose }: Prod
 
   const mainImg = imagesList[activeImgIdx] || imagesList[0] || '/imgs/hero_rackets.png';
 
-  const regularPrice = Number(product.price) || Number(product.salePrice) || 0;
-  const salePriceVal = Number(product.salePrice) || 0;
+  const isCase = selectedUnit === 'case' && Boolean(product.hasCasePricing && product.casePrice);
+  const regularPrice = isCase
+    ? Number(product.casePrice) || 0
+    : Number(product.piecePrice || product.price) || Number(product.salePrice) || 0;
+  const salePriceVal = isCase
+    ? Number(product.caseSalePrice) || 0
+    : Number(product.pieceSalePrice !== undefined ? product.pieceSalePrice : product.salePrice) || 0;
   const isOnSale = salePriceVal > 0 && salePriceVal < regularPrice;
   const displayPrice = isOnSale ? salePriceVal : regularPrice;
   const discount = isOnSale && regularPrice > 0 ? Math.round((1 - salePriceVal / regularPrice) * 100) : 0;
   const inStock = product.stockQuantity > 0;
 
   const handleAddToCart = () => {
+    const unitLabel = isCase
+      ? `Case (${product.caseUnitsCount || 12} pcs)`
+      : (product.hasCasePricing ? 'Single Piece' : '');
+    
+    const colorLabel = product.hasColors && selectedColor ? selectedColor : '';
+    const detailsSuffix = [colorLabel, unitLabel].filter(Boolean).join(' - ');
+    const itemName = detailsSuffix ? `${product.name} (${detailsSuffix})` : product.name;
+
+    const colorKey = colorLabel ? `-${colorLabel.toLowerCase().replace(/\s+/g, '-')}` : '';
+    const unitKey = isCase ? '-case' : (product.hasCasePricing ? '-piece' : '');
+    const cartItemId = `${product._id}${colorKey}${unitKey}`;
+
     addToCart({
-      _id: product._id,
-      name: product.name,
+      _id: cartItemId,
+      name: itemName,
       price: displayPrice,
       image: mainImg,
       quantity: qty,
+      brand: product.brand,
+      selectedColor: colorLabel || undefined,
+      selectedUnit: unitLabel || undefined,
+      stockQuantity: product.stockQuantity ?? 10
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -127,7 +158,7 @@ export default function ProductQuickViewModal({ product, isOpen, onClose }: Prod
                 <img
                   src={mainImg}
                   alt={product.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 16 }}
                   onError={e => { (e.target as HTMLImageElement).src = '/imgs/hero_rackets.png'; }}
                 />
                 {isOnSale && (
@@ -155,7 +186,7 @@ export default function ProductQuickViewModal({ product, isOpen, onClose }: Prod
                         background: '#14141E', cursor: 'pointer', flexShrink: 0
                       }}
                     >
-                      <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
                     </button>
                   ))}
                 </div>
@@ -200,14 +231,123 @@ export default function ProductQuickViewModal({ product, isOpen, onClose }: Prod
                 </span>
               </div>
 
+              {/* Packaging Option Selector (for Shuttlecocks & Multi-unit products) */}
+              {product.hasCasePricing && product.casePrice && (
+                <div style={{ background: '#12121C', padding: '12px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8, fontFamily: 'Outfit' }}>
+                    Select Option:
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedUnit('piece')}
+                      style={{
+                        padding: '10px 12px', borderRadius: 10, textAlign: 'left',
+                        background: selectedUnit === 'piece' ? 'rgba(176,28,40,0.22)' : 'rgba(255,255,255,0.03)',
+                        border: selectedUnit === 'piece' ? '2px solid var(--red-vivid)' : '1px solid rgba(255,255,255,0.1)',
+                        cursor: 'pointer', color: '#fff'
+                      }}
+                    >
+                      <div style={{ fontWeight: 800, fontSize: 13, fontFamily: 'Outfit', color: selectedUnit === 'piece' ? '#fff' : 'rgba(255,255,255,0.7)' }}>
+                        🏸 Single Piece
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--red-vivid)', fontWeight: 800, marginTop: 2 }}>
+                        Rs. {((product.pieceSalePrice !== undefined ? product.pieceSalePrice : product.salePrice) || (product.piecePrice || product.price)).toLocaleString()}
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedUnit('case')}
+                      style={{
+                        padding: '10px 12px', borderRadius: 10, textAlign: 'left',
+                        background: selectedUnit === 'case' ? 'rgba(176,28,40,0.22)' : 'rgba(255,255,255,0.03)',
+                        border: selectedUnit === 'case' ? '2px solid var(--red-vivid)' : '1px solid rgba(255,255,255,0.1)',
+                        cursor: 'pointer', color: '#fff'
+                      }}
+                    >
+                      <div style={{ fontWeight: 800, fontSize: 13, fontFamily: 'Outfit', color: selectedUnit === 'case' ? '#fff' : 'rgba(255,255,255,0.7)' }}>
+                        📦 Case ({product.caseUnitsCount || 12} pcs)
+                      </div>
+                      <div style={{ fontSize: 11, color: '#10B981', fontWeight: 800, marginTop: 2 }}>
+                        Rs. {(product.caseSalePrice || product.casePrice).toLocaleString()}
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Color Variants (if configured) */}
+              {product.hasColors && product.colors && product.colors.length > 0 && (
+                <div style={{ background: '#12121C', padding: '12px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: 'Outfit' }}>
+                      Available Colors:
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', fontFamily: 'Outfit' }}>
+                      {product.colors.length} {product.colors.length === 1 ? 'Color' : 'Colors'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    {product.colors.map(col => {
+                      const isSelected = (selectedColor || product.colors?.[0]) === col;
+                      const isWhite = col.toLowerCase() === '#ffffff' || col.toLowerCase() === 'white' || col.toLowerCase() === '#fff';
+                      const isLight = isWhite || col.toLowerCase() === '#facc15' || col.toLowerCase() === '#eab308';
+
+                      return (
+                        <button
+                          key={col}
+                          type="button"
+                          onClick={() => setSelectedColor(col)}
+                          title={col}
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: '50%',
+                            background: col,
+                            border: isSelected ? '2.5px solid var(--red-vivid)' : isWhite ? '1.5px solid #777' : '2px solid rgba(255,255,255,0.2)',
+                            boxShadow: isSelected ? '0 0 10px rgba(176,28,40,0.5), inset 0 0 0 2px #0D0D14' : '0 2px 6px rgba(0,0,0,0.4)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transform: isSelected ? 'scale(1.12)' : 'scale(1)',
+                            transition: 'all 0.18s ease',
+                            padding: 0
+                          }}
+                        >
+                          {isSelected && (
+                            <Check
+                              size={14}
+                              strokeWidth={3.5}
+                              style={{ color: isLight ? '#000000' : '#FFFFFF' }}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Price */}
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
                 <span style={{ fontFamily: 'Outfit', fontSize: 30, fontWeight: 900, color: '#FFFFFF' }}>
                   Rs. {displayPrice.toLocaleString()}
                 </span>
+                {isCase && (
+                  <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--red-vivid)', background: 'rgba(176,28,40,0.15)', padding: '2px 8px', borderRadius: 4, fontFamily: 'Outfit' }}>
+                    CASE / TUBE
+                  </span>
+                )}
+                {!isCase && product.hasCasePricing && (
+                  <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: 4, fontFamily: 'Outfit' }}>
+                    SINGLE PIECE
+                  </span>
+                )}
                 {isOnSale && (
                   <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through', fontFamily: 'Outfit' }}>
-                    Rs. {product.price.toLocaleString()}
+                    Rs. {regularPrice.toLocaleString()}
                   </span>
                 )}
               </div>

@@ -126,25 +126,6 @@ export default function AdminLogin() {
                 : <><LogIn size={17} /> Sign In</>}
             </button>
           </form>
-
-          {/* Hint */}
-          <div style={{ marginTop: 28, padding: '16px', borderRadius: 12, background: 'var(--bg-3)', border: '1px solid var(--border)' }}>
-            <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Demo Credentials</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {[
-                { role: 'Super Admin', email: 'admin@wbh.com', password: 'admin123' },
-                { role: 'Staff', email: 'staff@wbh.com', password: 'staff123' },
-              ].map(acc => (
-                <button key={acc.role} onClick={() => { setEmail(acc.email); setPassword(acc.password); }}
-                  style={{ textAlign: 'left', padding: '7px 10px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', transition: 'background 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-4)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>{acc.role}: </span>
-                  <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontFamily: 'monospace' }}>{acc.email} / {acc.password}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </motion.div>
     </div>

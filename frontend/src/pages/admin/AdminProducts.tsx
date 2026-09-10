@@ -26,6 +26,14 @@ interface Product {
   description: string;
   price: number;
   salePrice?: number;
+  hasCasePricing?: boolean;
+  casePrice?: number;
+  caseSalePrice?: number;
+  caseUnitsCount?: number;
+  piecePrice?: number;
+  pieceSalePrice?: number;
+  hasColors?: boolean;
+  colors?: string[];
   stockQuantity: number;
   images: string[];
   brand: string | { _id: string; name: string };
@@ -57,6 +65,13 @@ export default function AdminProducts() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<number | string>('');
   const [salePrice, setSalePrice] = useState('');
+  const [hasCasePricing, setHasCasePricing] = useState(false);
+  const [casePrice, setCasePrice] = useState<number | string>('');
+  const [caseSalePrice, setCaseSalePrice] = useState('');
+  const [caseUnitsCount, setCaseUnitsCount] = useState<number | string>('12');
+  const [hasColors, setHasColors] = useState(false);
+  const [colorList, setColorList] = useState<string[]>([]);
+  const [pickerColor, setPickerColor] = useState('#B01C28');
   const [stockQuantity, setStockQuantity] = useState<number | string>('');
   const [imageList, setImageList] = useState<string[]>([]);
   const [brandId, setBrandId] = useState('');
@@ -361,6 +376,14 @@ export default function AdminProducts() {
       setDescription(prod.description);
       setPrice(prod.price ?? '');
       setSalePrice(prod.salePrice ? String(prod.salePrice) : '');
+      setHasCasePricing(Boolean(prod.hasCasePricing));
+      setCasePrice(prod.casePrice ? String(prod.casePrice) : '');
+      setCaseSalePrice(prod.caseSalePrice ? String(prod.caseSalePrice) : '');
+      setCaseUnitsCount(prod.caseUnitsCount ? String(prod.caseUnitsCount) : '12');
+      const hasProdColors = Boolean(prod.hasColors || (Array.isArray(prod.colors) && prod.colors.length > 0));
+      setHasColors(hasProdColors);
+      setColorList(Array.isArray(prod.colors) ? prod.colors : []);
+      setPickerColor('#B01C28');
       setStockQuantity(prod.stockQuantity ?? '');
       
       const rawImgs = Array.isArray(prod.images) ? prod.images : [];
@@ -388,6 +411,13 @@ export default function AdminProducts() {
       setDescription('');
       setPrice('');
       setSalePrice('');
+      setHasCasePricing(false);
+      setCasePrice('');
+      setCaseSalePrice('');
+      setCaseUnitsCount('12');
+      setHasColors(false);
+      setColorList([]);
+      setPickerColor('#B01C28');
       setStockQuantity('');
       setImageList([]);
       setBrandId(brands[0]?._id || '');
@@ -397,6 +427,18 @@ export default function AdminProducts() {
       setIsFeatured(false);
       setSpecList([]);
     }
+  };
+
+  const handleAddColor = (hexToAdd?: string) => {
+    const val = (hexToAdd || pickerColor).trim();
+    if (!val) return;
+    if (!colorList.some(c => c.toLowerCase() === val.toLowerCase())) {
+      setColorList(prev => [...prev, val]);
+    }
+  };
+
+  const handleRemoveColor = (idx: number) => {
+    setColorList(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handleAddSpec = () => {
@@ -450,6 +492,14 @@ export default function AdminProducts() {
       description,
       price: finalPrice,
       salePrice: salePriceVal,
+      hasCasePricing: Boolean(hasCasePricing),
+      casePrice: hasCasePricing && casePrice ? Number(casePrice) : undefined,
+      caseSalePrice: hasCasePricing && caseSalePrice ? Number(caseSalePrice) : undefined,
+      caseUnitsCount: hasCasePricing && caseUnitsCount ? Number(caseUnitsCount) : 12,
+      piecePrice: finalPrice,
+      pieceSalePrice: salePriceVal,
+      hasColors: Boolean(hasColors),
+      colors: hasColors ? colorList : [],
       stockQuantity: Number(stockQuantity),
       images: imageList,
       brand: resolvedBrand,
@@ -649,20 +699,45 @@ export default function AdminProducts() {
                         src={mainImage}
                         alt={p.name}
                         onError={e => { (e.currentTarget as HTMLImageElement).src = '/imgs/hero_rackets.png'; }}
-                        style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.12)', background: '#060609' }}
+                        style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'contain', padding: 2, border: '1px solid rgba(255,255,255,0.12)', background: '#060609' }}
                       />
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       <div style={{ fontWeight: 700, fontSize: 14, color: '#FFFFFF', fontFamily: 'Outfit' }}>{p.name}</div>
                       <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter' }}>{categoryName}</div>
+                      {p.colors && p.colors.length > 0 && (
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5, alignItems: 'center' }}>
+                          {p.colors.map((c, i) => (
+                            <span
+                              key={i}
+                              title={c}
+                              style={{
+                                width: 13, height: 13, borderRadius: '50%',
+                                background: c,
+                                border: c.toLowerCase() === '#ffffff' || c.toLowerCase() === 'white' ? '1px solid #777' : '1px solid rgba(255,255,255,0.3)',
+                                display: 'inline-block',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.5)'
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace', fontWeight: 600 }}>{p.sku}</div>
                       <div style={{ fontSize: 11.5, color: 'var(--red-vivid)', fontWeight: 800 }}>{brandName}</div>
                     </td>
                     <td style={{ padding: '14px 20px' }}>
-                      <div style={{ fontWeight: 800, fontSize: 14, color: '#FFFFFF', fontFamily: 'Outfit' }}>Rs. {displayPrice.toLocaleString()}</div>
+                      <div style={{ fontWeight: 800, fontSize: 14, color: '#FFFFFF', fontFamily: 'Outfit' }}>
+                        Rs. {displayPrice.toLocaleString()} {p.hasCasePricing && <span style={{ fontSize: 10.5, color: 'var(--red-vivid)', fontWeight: 900 }}>/ piece</span>}
+                      </div>
                       {p.salePrice && <div style={{ fontSize: 11, textDecoration: 'line-through', color: 'rgba(255,255,255,0.4)' }}>Rs. {p.price.toLocaleString()}</div>}
+                      {p.hasCasePricing && p.casePrice && (
+                        <div style={{ fontSize: 11, color: '#10B981', fontWeight: 700, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>📦 Case ({p.caseUnitsCount || 12} pcs):</span>
+                          <span>Rs. {(p.caseSalePrice || p.casePrice).toLocaleString()}</span>
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -869,6 +944,263 @@ export default function AdminProducts() {
                       min={0}
                     />
                   </div>
+                </div>
+
+                {/* Section 2.5: Shuttlecock / Tennis Ball Case Pricing (Only visible when Shuttlecock or Tennis Ball category selected) */}
+                {(() => {
+                  const selectedCatObj = categories.find(c => c._id === categoryId);
+                  const catName = (selectedCatObj?.name || (typeof selectedProduct?.category === 'object' ? selectedProduct.category.name : '') || categoryId || '').toLowerCase();
+                  const isShuttlecockOrBall = catName.includes('shuttlecock') || catName.includes('shuttle') || catName.includes('tennis ball') || catName.includes('ball');
+                  
+                  if (!isShuttlecockOrBall) return null;
+
+                  return (
+                    <div style={{
+                      padding: 16,
+                      borderRadius: 16,
+                      background: hasCasePricing ? 'rgba(176,28,40,0.1)' : '#161622',
+                      border: hasCasePricing ? '1.5px solid rgba(176,28,40,0.45)' : '1.5px solid rgba(255,255,255,0.12)',
+                      transition: 'all 0.25s ease'
+                    }}>
+                      <label
+                        htmlFor="hasCasePricing"
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', userSelect: 'none' }}
+                      >
+                        <input
+                          type="checkbox"
+                          id="hasCasePricing"
+                          checked={hasCasePricing}
+                          onChange={e => setHasCasePricing(e.target.checked)}
+                          style={{ width: 18, height: 18, accentColor: 'var(--red-vivid)', cursor: 'pointer' }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#FFFFFF', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span>Shuttlecock & Multi-Pack Pricing (Sell by Single Piece & Full Case / Tube)</span>
+                            {hasCasePricing && (
+                              <span style={{ fontSize: 10, fontWeight: 900, background: 'var(--red-vivid)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontFamily: 'Outfit' }}>
+                                CASE ENABLED
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter', marginTop: 2 }}>
+                            Enable to allow customers to choose between purchasing an individual piece or a full case/tube with package pricing.
+                          </div>
+                        </div>
+                      </label>
+
+                  {hasCasePricing && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div>
+                        <label style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 6 }}>
+                          Case / Tube Regular Price (LKR)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 9500"
+                          value={casePrice}
+                          onChange={e => setCasePrice(e.target.value)}
+                          style={{
+                            width: '100%', padding: '10px 14px', background: '#12121C',
+                            border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 12,
+                            color: '#FFFFFF', fontSize: 13.5, fontFamily: 'Outfit', fontWeight: 700, outline: 'none'
+                          }}
+                          min={1}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 6 }}>
+                          Case / Tube Sale Price (Optional)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 8900"
+                          value={caseSalePrice}
+                          onChange={e => setCaseSalePrice(e.target.value)}
+                          style={{
+                            width: '100%', padding: '10px 14px', background: '#12121C',
+                            border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 12,
+                            color: '#FFFFFF', fontSize: 13.5, fontFamily: 'Outfit', fontWeight: 700, outline: 'none'
+                          }}
+                          min={1}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 6 }}>
+                          Pieces per Case / Tube
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="12"
+                          value={caseUnitsCount}
+                          onChange={e => setCaseUnitsCount(e.target.value)}
+                          style={{
+                            width: '100%', padding: '10px 14px', background: '#12121C',
+                            border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 12,
+                            color: '#FFFFFF', fontSize: 13.5, fontFamily: 'Outfit', fontWeight: 700, outline: 'none'
+                          }}
+                          min={1}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+                {/* Section 2.6: Color Options (Color Picker only, no emojis/name input) */}
+                <div style={{
+                  padding: 16,
+                  borderRadius: 16,
+                  background: hasColors ? 'rgba(59,130,246,0.08)' : '#161622',
+                  border: hasColors ? '1.5px solid rgba(59,130,246,0.45)' : '1.5px solid rgba(255,255,255,0.12)',
+                  transition: 'all 0.25s ease'
+                }}>
+                  <label
+                    htmlFor="hasColors"
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    <input
+                      type="checkbox"
+                      id="hasColors"
+                      checked={hasColors}
+                      onChange={e => setHasColors(e.target.checked)}
+                      style={{ width: 18, height: 18, accentColor: '#3B82F6', cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#FFFFFF', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>Available Color Options (Enable Multi-Color Variants)</span>
+                        {hasColors && (
+                          <span style={{ fontSize: 10, fontWeight: 900, background: '#3B82F6', color: '#fff', padding: '2px 8px', borderRadius: 6, fontFamily: 'Outfit' }}>
+                            {colorList.length} COLORS
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter', marginTop: 2 }}>
+                        Tick this option to allow customers to choose from different product colors.
+                      </div>
+                    </div>
+                  </label>
+
+                  {hasColors && (
+                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                      {/* Color Picker & Add Button */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          background: '#12121C', padding: '8px 12px', borderRadius: 12,
+                          border: '1.5px solid rgba(255,255,255,0.14)'
+                        }}>
+                          <input
+                            type="color"
+                            value={pickerColor}
+                            onChange={e => setPickerColor(e.target.value)}
+                            style={{
+                              width: 36, height: 36, borderRadius: 8, border: 'none',
+                              cursor: 'pointer', background: 'transparent', padding: 0
+                            }}
+                          />
+                          <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: '#FFFFFF', letterSpacing: 1 }}>
+                            {pickerColor.toUpperCase()}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddColor(pickerColor)}
+                          style={{
+                            padding: '10px 20px', borderRadius: 12, background: '#3B82F6', color: '#FFFFFF',
+                            border: 'none', fontWeight: 800, fontSize: 13.5, fontFamily: 'Outfit', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 6
+                          }}
+                        >
+                          <Plus size={15} /> Add Color
+                        </button>
+                      </div>
+
+                      {/* Quick Preset Colors Palette */}
+                      <div style={{ marginBottom: 16 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Outfit', display: 'block', marginBottom: 8 }}>
+                          Quick Select Palette:
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {[
+                            '#EF4444', '#3B82F6', '#18181B', '#FFFFFF', '#1E3A8A', '#FACC15',
+                            '#10B981', '#8B5CF6', '#F97316', '#06B6D4', '#84CC16', '#EC4899',
+                            '#EAB308', '#94A3B8'
+                          ].map(hex => {
+                            const isAdded = colorList.includes(hex);
+                            return (
+                              <button
+                                key={hex}
+                                type="button"
+                                onClick={() => handleAddColor(hex)}
+                                title={hex}
+                                style={{
+                                  width: 28, height: 28, borderRadius: '50%',
+                                  background: hex,
+                                  border: isAdded ? '2px solid #3B82F6' : hex === '#FFFFFF' ? '1px solid #666' : '1px solid rgba(255,255,255,0.25)',
+                                  boxShadow: isAdded ? '0 0 8px rgba(59,130,246,0.6)' : '0 2px 4px rgba(0,0,0,0.4)',
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  transition: 'transform 0.15s ease'
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.15)')}
+                                onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                              >
+                                {isAdded && <span style={{ color: hex === '#FFFFFF' || hex === '#FACC15' ? '#000' : '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Attached Colors List */}
+                      {colorList.length > 0 ? (
+                        <div>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Outfit', display: 'block', marginBottom: 8 }}>
+                            Selected Colors ({colorList.length}):
+                          </span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                            {colorList.map((col, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                                  padding: '5px 10px 5px 6px', borderRadius: 99,
+                                  background: '#1A1A28', border: '1px solid rgba(255,255,255,0.18)'
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 20, height: 20, borderRadius: '50%',
+                                    background: col,
+                                    border: col.toLowerCase() === '#ffffff' || col.toLowerCase() === 'white' ? '1px solid #888' : '1px solid rgba(255,255,255,0.3)',
+                                    display: 'inline-block'
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveColor(idx)}
+                                  title="Remove color"
+                                  style={{
+                                    background: 'none', border: 'none', color: '#F87171',
+                                    cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center'
+                                  }}
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+                          No colors added yet. Pick a color above and click Add Color.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Section 3: Brand & Category */}
@@ -1153,7 +1485,7 @@ export default function AdminProducts() {
                             <img
                               src={imgUrl}
                               alt="Product Media"
-                              style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }}
+                              style={{ width: '100%', height: 90, objectFit: 'contain', padding: 6, display: 'block' }}
                               onError={e => {
                                 (e.currentTarget as HTMLImageElement).src = '/imgs/hero_rackets.png';
                               }}

@@ -5,8 +5,11 @@ interface CartItem {
   name: string;
   price: number;
   salePrice?: number;
-  images: string[];
-  brand: { name: string };
+  image?: string;
+  images?: string[];
+  brand?: { name: string };
+  selectedColor?: string;
+  selectedUnit?: string;
   quantity: number;
   stockQuantity: number;
 }

@@ -93,8 +93,8 @@ export default function Contact() {
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                   {[
-                    { icon: Instagram, label: 'Instagram', href: 'https://instagram.com' },
-                    { icon: Facebook, label: 'Facebook', href: 'https://facebook.com' },
+                    { icon: Instagram, label: 'Instagram', href: 'https://www.instagram.com/wayamba_badminton_home/' },
+                    { icon: Facebook, label: 'Facebook', href: 'https://www.facebook.com/p/Wayamba-Badminton-Home-100063634833921/' },
                   ].map(({ icon: Icon, label, href }) => (
                     <a key={label} href={href} target="_blank" rel="noopener noreferrer"
                       style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 10, background: 'var(--bg-4)', border: '1px solid var(--b2)', color: 'var(--t1)', fontSize: 13, fontWeight: 700, textDecoration: 'none', transition: 'all 0.22s var(--ease)', fontFamily: 'Outfit' }}

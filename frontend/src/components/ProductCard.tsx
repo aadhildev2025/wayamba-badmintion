@@ -7,6 +7,14 @@ import { useCart } from '@/context/CartContext';
 interface Product {
   _id: string; name: string; slug: string;
   price: number; salePrice?: number;
+  hasCasePricing?: boolean;
+  casePrice?: number;
+  caseSalePrice?: number;
+  caseUnitsCount?: number;
+  piecePrice?: number;
+  pieceSalePrice?: number;
+  hasColors?: boolean;
+  colors?: string[];
   images?: { url: string }[];
   brand?: { name: string }; category?: { name: string };
   stockQuantity: number;
@@ -32,8 +40,8 @@ export default function ProductCard({ product }: { product: Product }) {
     src = (activeImg as any).url;
   }
 
-  const regularPrice = Number(product.price) || Number(product.salePrice) || 0;
-  const salePriceVal = Number(product.salePrice) || 0;
+  const regularPrice = Number(product.piecePrice || product.price) || Number(product.salePrice) || 0;
+  const salePriceVal = Number(product.pieceSalePrice !== undefined ? product.pieceSalePrice : product.salePrice) || 0;
   const isOnSale = salePriceVal > 0 && salePriceVal < regularPrice;
   const displayPrice = isOnSale ? salePriceVal : regularPrice;
   const discount = isOnSale && regularPrice > 0 ? Math.round((1 - salePriceVal / regularPrice) * 100) : 0;
@@ -46,7 +54,18 @@ export default function ProductCard({ product }: { product: Product }) {
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!inStock) return;
-    addToCart({ _id: product._id, name: product.name, price: displayPrice, image: src });
+    if ((product.hasCasePricing && product.casePrice) || (product.hasColors && product.colors && product.colors.length > 1)) {
+      setQuickViewOpen(true);
+      return;
+    }
+    const defaultColor = product.hasColors && product.colors?.[0] ? product.colors[0] : undefined;
+    addToCart({
+      _id: defaultColor ? `${product._id}-${defaultColor.toLowerCase().replace(/\s+/g, '-')}` : product._id,
+      name: defaultColor ? `${product.name} (${defaultColor})` : product.name,
+      price: displayPrice,
+      image: src,
+      selectedColor: defaultColor
+    });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -88,6 +107,14 @@ export default function ProductCard({ product }: { product: Product }) {
           {product.isFeatured && (
             <span className="pcard-badge pcard-badge-feat">Featured</span>
           )}
+          {product.hasColors && product.colors && product.colors.length > 0 && (
+            <span className="pcard-badge" style={{ background: '#3B82F6', color: '#fff' }}>
+              {product.colors.length} Colors
+            </span>
+          )}
+          {product.hasCasePricing && product.casePrice && (
+            <span className="pcard-badge" style={{ background: '#10B981', color: '#fff' }}>Piece & Case</span>
+          )}
           {isOnSale && (
             <span className="pcard-badge pcard-badge-sale">-{discount}% OFF</span>
           )}
@@ -127,6 +154,32 @@ export default function ProductCard({ product }: { product: Product }) {
 
         <div className="pcard-name">{product.name}</div>
 
+        {/* Color preview dots */}
+        {product.hasColors && product.colors && product.colors.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+            {product.colors.slice(0, 5).map((col, idx) => (
+              <span
+                key={idx}
+                title={col}
+                style={{
+                  width: 11,
+                  height: 11,
+                  borderRadius: '50%',
+                  background: col,
+                  border: col.toLowerCase() === '#ffffff' || col.toLowerCase() === 'white' ? '1px solid #777' : '1px solid rgba(255,255,255,0.3)',
+                  display: 'inline-block',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                }}
+              />
+            ))}
+            {product.colors.length > 5 && (
+              <span style={{ fontSize: 10, color: 'var(--t4)', fontWeight: 700 }}>
+                +{product.colors.length - 5}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Stars Pill (Only shown if real reviews exist) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, minHeight: 18 }}>
           {hasReviews ? (
@@ -151,13 +204,18 @@ export default function ProductCard({ product }: { product: Product }) {
         </div>
 
         {/* Price Tag */}
-        <div className="pcard-price-row">
+        <div className="pcard-price-row" style={{ alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
           <span className="pcard-price">
-            Rs. {displayPrice.toLocaleString()}
+            Rs. {displayPrice.toLocaleString()} {product.hasCasePricing ? <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 600 }}>/ pc</span> : null}
           </span>
           {isOnSale && (
             <span className="pcard-oldprice">
-              Rs. {product.price.toLocaleString()}
+              Rs. {regularPrice.toLocaleString()}
+            </span>
+          )}
+          {product.hasCasePricing && product.casePrice && (
+            <span style={{ fontSize: 11, color: '#10B981', fontWeight: 700, width: '100%', marginTop: 2 }}>
+              Case: Rs. {(product.caseSalePrice || product.casePrice).toLocaleString()} ({product.caseUnitsCount || 12} pcs)
             </span>
           )}
         </div>

@@ -34,6 +34,9 @@ const uploadToCloudinary = (fileBuffer, folder = 'wayamba_products') => {
         const uploadStream = cloudinary_1.v2.uploader.upload_stream({
             folder,
             resource_type: 'image',
+            transformation: [
+                { width: 1600, height: 1600, crop: 'limit', quality: 'auto:good', fetch_format: 'auto' }
+            ],
         }, (error, result) => {
             if (error || !result) {
                 return reject(error || new Error('Upload to Cloudinary failed'));

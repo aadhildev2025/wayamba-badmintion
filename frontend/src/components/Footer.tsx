@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Instagram, Facebook, Youtube, Mail, Phone, MapPin, ChevronRight, ShieldCheck, Truck, Zap } from 'lucide-react';
+import { Instagram, Facebook, Mail, Phone, MapPin, ChevronRight, ShieldCheck, Truck, Zap } from 'lucide-react';
 
 const CATALOG = [
   { label: 'Badminton Rackets & Strings', to: '/shop?category=Badminton%20Rackets' },
@@ -16,9 +16,8 @@ const QUICK = [
   { label: 'Contact Us',          to: '/contact' },
 ];
 const SOCIALS = [
-  { Icon: Instagram, href: 'https://instagram.com', label: 'Instagram' },
-  { Icon: Facebook,  href: 'https://facebook.com',  label: 'Facebook'  },
-  { Icon: Youtube,   href: 'https://youtube.com',   label: 'YouTube'   },
+  { Icon: Instagram, href: 'https://www.instagram.com/wayamba_badminton_home/', label: 'Instagram' },
+  { Icon: Facebook,  href: 'https://www.facebook.com/p/Wayamba-Badminton-Home-100063634833921/',  label: 'Facebook'  },
 ];
 
 function FooterLink({ label, to }: { label: string; to: string }) {

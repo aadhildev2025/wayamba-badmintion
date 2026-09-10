@@ -56,7 +56,8 @@ const SLIDES = [
 
 /* ── Fallback Data ── */
 export const FALLBACK_PRODUCTS: any[] = [
-  { _id:'p1', name:'Yonex Astrox 100ZZ Kurenai', slug:'yonex-astrox-100zz-kurenai', price:58500, salePrice:55000, stockQuantity:12, images:[{url:'/imgs/hero_rackets.png'}], brand:{name:'Yonex'}, category:{name:'Badminton Rackets'}, isFeatured:true, averageRating:0, reviewCount:0 },
+  { _id:'p1', name:'Yonex Astrox 100ZZ Kurenai', slug:'yonex-astrox-100zz-kurenai', price:58500, salePrice:55000, stockQuantity:12, images:[{url:'/imgs/hero_rackets.png'}], brand:{name:'Yonex'}, category:{name:'Badminton Rackets'}, isFeatured:true, averageRating:5, reviewCount:14 },
+  { _id:'p2', name:'Yonex Aerosensa 50 Shuttlecocks', slug:'yonex-aerosensa-50-feather-shuttlecocks', price:850, salePrice:800, hasCasePricing:true, piecePrice:850, pieceSalePrice:800, casePrice:9500, caseSalePrice:8900, caseUnitsCount:12, stockQuantity:45, images:[{url:'/imgs/hero_shuttlecock.png'}], brand:{name:'Yonex'}, category:{name:'Shuttlecocks'}, isFeatured:true, averageRating:5, reviewCount:9 },
 ];
 
 export const FALLBACK_CATEGORIES: any[] = [

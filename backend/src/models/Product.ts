@@ -12,6 +12,14 @@ export interface IProduct extends Document {
   description: string;
   price: number;
   salePrice?: number;
+  hasCasePricing?: boolean;
+  casePrice?: number;
+  caseSalePrice?: number;
+  caseUnitsCount?: number;
+  piecePrice?: number;
+  pieceSalePrice?: number;
+  hasColors?: boolean;
+  colors?: string[];
   stockQuantity: number;
   images: string[];
   brand: mongoose.Types.ObjectId;
@@ -37,6 +45,14 @@ const ProductSchema: Schema = new Schema(
     description: { type: String, default: '' },
     price: { type: Number, required: true, min: 0 },
     salePrice: { type: Number, min: 0 },
+    hasCasePricing: { type: Boolean, default: false },
+    casePrice: { type: Number, min: 0 },
+    caseSalePrice: { type: Number, min: 0 },
+    caseUnitsCount: { type: Number, default: 12, min: 1 },
+    piecePrice: { type: Number, min: 0 },
+    pieceSalePrice: { type: Number, min: 0 },
+    hasColors: { type: Boolean, default: false },
+    colors: [{ type: String }],
     stockQuantity: { type: Number, required: true, default: 0, min: 0 },
     images: [{ type: String }],
     brand: { type: Schema.Types.ObjectId, ref: 'Brand', required: true },

@@ -4,11 +4,12 @@ import { Search, SlidersHorizontal, X, ChevronDown, Package, Grid3X3, List } fro
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '@/lib/api';
 import ProductCard from '@/components/ProductCard';
-import { useCart } from '@/context/CartContext';
 import { FALLBACK_PRODUCTS, FALLBACK_CATEGORIES } from './Home';
 
 interface Product {
   _id: string; name: string; slug: string; price: number; salePrice?: number;
+  hasCasePricing?: boolean; casePrice?: number; caseSalePrice?: number; caseUnitsCount?: number;
+  piecePrice?: number; pieceSalePrice?: number;
   images?: { url: string }[]; brand?: { name: string; _id?: string }; category?: { name: string; _id?: string };
   stockQuantity: number; averageRating?: number; reviewCount?: number; isFeatured?: boolean;
 }
@@ -29,15 +30,20 @@ const DEFAULT_BRANDS: FilterItem[] = [
 function FilterBlock({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
-    <div style={{ borderRadius: 14, border: '1px solid var(--b1)', background: 'var(--bg-3)', overflow: 'hidden' }}>
-      <button onClick={() => setOpen(!open)} style={{
-        width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '13px 16px', background: 'none', border: 'none', cursor: 'pointer',
-      }}>
-        <span style={{ fontFamily: 'Outfit', fontWeight: 800, fontSize: 11.5, color: 'var(--t1)', textTransform: 'uppercase', letterSpacing: 1.5 }}>{title}</span>
+    <div style={{ borderBottom: '1px solid var(--b1)', paddingBottom: 18, marginBottom: 18 }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 10px',
+        }}
+      >
+        <span style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1.2, color: 'var(--t1)' }}>
+          {title}
+        </span>
         <ChevronDown size={14} style={{ color: 'var(--t3)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
-      {open && <div style={{ padding: '8px 12px 14px', borderTop: '1px solid var(--b1)' }}>{children}</div>}
+      {open && children}
     </div>
   );
 }
@@ -46,7 +52,7 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '6px 14px', borderRadius: 99,
+      padding: '5px 12px', borderRadius: 99,
       background: 'var(--red-vivid)', color: '#FFFFFF',
       fontSize: 12.5, fontWeight: 800, fontFamily: 'Outfit',
       boxShadow: '0 2px 10px rgba(176,28,40,0.3)'
@@ -60,15 +66,16 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
 }
 
 function ListCard({ product }: { product: Product }) {
-  const { addToCart } = useCart();
   const navigate = useNavigate();
   let imgSrc = '/imgs/hero_rackets.png';
   if (Array.isArray(product.images) && product.images.length > 0) {
     const firstImg = (product.images as any)[0];
     imgSrc = typeof firstImg === 'string' ? firstImg : firstImg?.url || '/imgs/hero_rackets.png';
   }
-  const displayPrice = product.salePrice && product.salePrice < product.price ? product.salePrice : product.price;
-  const isOnSale = !!product.salePrice && product.salePrice < product.price;
+  const regularPrice = Number(product.piecePrice || product.price) || 0;
+  const salePriceVal = Number(product.pieceSalePrice !== undefined ? product.pieceSalePrice : product.salePrice) || 0;
+  const isOnSale = salePriceVal > 0 && salePriceVal < regularPrice;
+  const displayPrice = isOnSale ? salePriceVal : regularPrice;
 
   return (
     <div
@@ -91,25 +98,35 @@ function ListCard({ product }: { product: Product }) {
       }}
     >
       <div style={{ width: 96, height: 96, borderRadius: 14, background: 'var(--bg-4)', overflow: 'hidden', flexShrink: 0, border: '1px solid var(--b1)' }}>
-        <img src={imgSrc} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).src = '/imgs/hero_rackets.png'; }} />
+        <img src={imgSrc} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 6 }} onError={e => { (e.target as HTMLImageElement).src = '/imgs/hero_rackets.png'; }} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontFamily: 'Outfit', fontSize: 10, fontWeight: 900, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--red-vivid)', marginBottom: 5 }}>{product.brand?.name}</div>
-        <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 16.5, color: 'var(--t1)', marginBottom: 10, lineHeight: 1.25 }}>{product.name}</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 16.5, color: 'var(--t1)', marginBottom: 6, lineHeight: 1.25 }}>{product.name}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
           <span style={{
             fontFamily: 'Outfit', fontWeight: 800, fontSize: 18,
             background: 'var(--grad-silver)', WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-          }}>Rs. {displayPrice.toLocaleString()}</span>
-          {isOnSale && <span style={{ fontSize: 13, color: 'var(--t3)', textDecoration: 'line-through' }}>Rs. {product.price.toLocaleString()}</span>}
+          }}>Rs. {displayPrice.toLocaleString()} {product.hasCasePricing ? <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 600 }}>/ piece</span> : null}</span>
+          {isOnSale && <span style={{ fontSize: 13, color: 'var(--t3)', textDecoration: 'line-through' }}>Rs. {regularPrice.toLocaleString()}</span>}
         </div>
+        {product.hasCasePricing && product.casePrice && (
+          <div style={{ fontSize: 11.5, color: '#10B981', fontWeight: 700, marginTop: 4 }}>
+            📦 Case / Tube ({product.caseUnitsCount || 12} pcs): Rs. {(product.caseSalePrice || product.casePrice).toLocaleString()}
+          </div>
+        )}
       </div>
       <button
-        onClick={e => { e.stopPropagation(); addToCart({ _id: product._id, name: product.name, price: displayPrice, image: imgSrc }); }}
+        onClick={e => {
+          e.stopPropagation();
+          navigate(`/product/${product.slug}`);
+        }}
         className="btn btn-primary btn-sm"
         style={{ alignSelf: 'center', flexShrink: 0 }}
-      >Add to Cart</button>
+      >
+        {product.hasCasePricing ? 'Select Option' : 'View Details'}
+      </button>
     </div>
   );
 }
