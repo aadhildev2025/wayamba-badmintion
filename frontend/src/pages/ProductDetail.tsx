@@ -7,6 +7,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/context/CartContext';
 import api from '@/lib/api';
+import SEO from '@/components/SEO';
 import { FALLBACK_PRODUCTS } from './Home';
 
 interface ProductData {
@@ -224,8 +225,53 @@ export default function ProductDetail() {
     specsList = Object.entries(product.specifications).map(([key, value]) => ({ key, value: String(value) }));
   }
 
+  // Product Schema.org structured data for Google Search rich snippets
+  const productJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    image: rawImages.map(img => img.url.startsWith('http') ? img.url : `https://www.wayamba-badmintion-home.com${img.url}`),
+    description: product.description || `Buy genuine ${product.name} in Sri Lanka at Wayamba Badminton Home. 100% authentic equipment with fast islandwide delivery.`,
+    sku: product._id,
+    brand: {
+      '@type': 'Brand',
+      name: product.brand?.name || 'Wayamba Sports',
+    },
+    offers: {
+      '@type': 'Offer',
+      url: typeof window !== 'undefined' ? window.location.href : `https://www.wayamba-badmintion-home.com/product/${slug}`,
+      priceCurrency: 'LKR',
+      price: displayPrice,
+      priceValidUntil: '2027-12-31',
+      itemCondition: 'https://schema.org/NewCondition',
+      availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      seller: {
+        '@type': 'SportingGoodsStore',
+        name: 'Wayamba Badminton Home',
+      },
+    },
+    ...(product.averageRating && product.reviewCount ? {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: product.averageRating,
+        reviewCount: product.reviewCount,
+      }
+    } : {}),
+  };
+
+  const productKeywords = `${product.name} price Sri Lanka, buy ${product.name} Sri Lanka, ${product.brand?.name || ''} badminton Sri Lanka, buy sports equipment Sri Lanka, Wayamba Badminton Home`;
+
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', position: 'relative' }}>
+      <SEO
+        title={`Buy ${product.name} in Sri Lanka`}
+        description={`Buy authentic ${product.name} at Rs. ${displayPrice.toLocaleString()} in Sri Lanka. 100% genuine with islandwide express delivery.`}
+        keywords={productKeywords}
+        ogImage={rawImages[0]?.url.startsWith('http') ? rawImages[0].url : `https://www.wayamba-badmintion-home.com${rawImages[0]?.url}`}
+        ogType="product"
+        jsonLd={productJsonLd}
+      />
+
       {/* Breadcrumb */}
       <div style={{ borderBottom: '1px solid var(--b1)', background: 'var(--bg-2)', padding: '14px 0' }}>
         <div className="container">

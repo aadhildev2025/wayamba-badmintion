@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import { Award, Users, Target, Heart, CheckCircle, ArrowRight } from 'lucide-react';
 import ImageSlider from '@/components/ImageSlider';
+import SEO from '@/components/SEO';
 
 function FadeIn({ children, delay = 0, x = 0, y = 24 }: { children: React.ReactNode; delay?: number; x?: number; y?: number }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -31,6 +32,11 @@ export default function About() {
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', position: 'relative' }}>
+      <SEO
+        title="About Us - Authentic Badminton & Sports Store in Sri Lanka"
+        description="Learn about Wayamba Badminton Home, Sri Lanka's leading badminton and sports store. Providing authentic Yonex, Li-Ning, Victor gear, strings, and tournament equipment across Sri Lanka."
+        keywords="About Wayamba Badminton, Badminton shop Sri Lanka, authentic badminton Sri Lanka, sports equipment distributor Sri Lanka"
+      />
 
       {/* ── HERO ── */}
       <section style={{ padding: '80px 0 64px', borderBottom: '1px solid var(--b1)', position: 'relative', overflow: 'hidden' }}>

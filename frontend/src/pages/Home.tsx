@@ -3,10 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import {
   ArrowRight, ChevronLeft, ChevronRight, Truck, Shield, Zap,
-  Package, CheckCircle2, ArrowUpRight
+  Package, CheckCircle2, ArrowUpRight, HelpCircle, Sparkles
 } from 'lucide-react';
 import api from '@/lib/api';
 import ProductCard from '@/components/ProductCard';
+import SEO from '@/components/SEO';
 
 /* ── Slider Data ── */
 const SLIDES = [
@@ -134,6 +135,11 @@ export default function Home() {
 
   return (
     <div style={{ background: 'var(--bg)', position: 'relative', overflow: 'hidden' }}>
+      <SEO
+        title="Buy Badminton Rackets, Shuttlecocks & Sports Gear in Sri Lanka"
+        description="Looking to buy badminton rackets, shuttlecocks, or sports equipment in Sri Lanka? Wayamba Badminton Home is Sri Lanka's trusted shop for 100% genuine Yonex, Li-Ning, Victor gear, cricket bats & tennis rackets with islandwide express delivery."
+        keywords="Buy badminton rackets Sri Lanka, Badminton shop Sri Lanka, Yonex badminton racket price Sri Lanka, Li-Ning badminton Sri Lanka, Victor badminton Sri Lanka, buy shuttlecocks Sri Lanka, badminton shoes Sri Lanka, badminton stringing Sri Lanka, sports shop Sri Lanka, cricket bats Sri Lanka, tennis rackets Sri Lanka, Wayamba Badminton Home"
+      />
 
       {/* Ambient background mesh glow */}
       <div className="mesh-glow" style={{ top: -100, left: -150 }} />
@@ -515,6 +521,84 @@ export default function Home() {
               </FadeIn>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════
+          SRI LANKA SPORTS & BADMINTON SEO AUTHORITY & FAQ SECTION
+      ══════════════════════════════════ */}
+      <section className="section" style={{ background: 'var(--bg)', borderTop: '1px solid var(--b1)' }}>
+        <div className="container">
+          <FadeIn>
+            <div style={{ maxWidth: 880, margin: '0 auto' }}>
+              <div className="eyebrow" style={{ marginBottom: 12 }}>Sri Lanka's #1 Sports & Badminton Destination</div>
+              <h2 className="display-md" style={{ color: 'var(--t1)', marginBottom: 20 }}>
+                Buy 100% Genuine <span className="text-gradient">Badminton & Sports Gear</span> Across Sri Lanka
+              </h2>
+              <p style={{ color: 'var(--t3)', fontSize: 16, lineHeight: 1.8, marginBottom: 36 }}>
+                Welcome to <strong>Wayamba Badminton Home</strong> — the authorized destination for authentic badminton equipment, cricket gear, and tennis racquets in Sri Lanka. Whether you are in <strong>Colombo, Kandy, Galle, Gampaha, Kurunegala, Jaffna, Puttalam</strong>, or anywhere across the island, we deliver championship-ready sports gear directly to your doorstep with cash on delivery and secure bank transfer options.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, marginBottom: 48 }}>
+                {[
+                  {
+                    title: 'Yonex, Li-Ning & Victor Rackets',
+                    desc: 'Official authorized stockist with authentic holographic verification codes and warranty against manufacturing defects.'
+                  },
+                  {
+                    title: 'BWF-Grade Shuttlecocks & Court Shoes',
+                    desc: 'Aerosensa tournament feather shuttlecocks, Mavis nylon shuttles, and non-marking high-grip indoor court footwear.'
+                  },
+                  {
+                    title: 'Island-Wide Express Delivery',
+                    desc: 'Fast doorstep shipping to all 25 districts in Sri Lanka with careful packaging to guarantee safe delivery of strung racquets.'
+                  }
+                ].map(item => (
+                  <div key={item.title} className="card" style={{ padding: 24, borderRadius: 18 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <Sparkles size={18} style={{ color: 'var(--red-vivid)' }} />
+                      <h3 style={{ fontFamily: 'Outfit', fontSize: 16, fontWeight: 700, color: 'var(--t1)' }}>{item.title}</h3>
+                    </div>
+                    <p style={{ fontSize: 13.5, color: 'var(--t3)', lineHeight: 1.6 }}>{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* FAQ Accordion / Grid for Rich Search Results */}
+              <div style={{ background: 'var(--bg-2)', borderRadius: 24, padding: '36px 32px', border: '1px solid var(--b1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                  <HelpCircle size={22} style={{ color: 'var(--red-vivid)' }} />
+                  <h3 className="display-sm" style={{ color: 'var(--t1)' }}>Frequently Asked Questions</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {[
+                    {
+                      q: 'How can I buy genuine badminton rackets online in Sri Lanka?',
+                      a: 'You can order directly through our online store. Browse our badminton racket collection, select your preferred brand (Yonex, Li-Ning, Victor, Apacs), and proceed to checkout with islandwide delivery to any location in Sri Lanka.'
+                    },
+                    {
+                      q: 'Do you deliver badminton and sports gear outside Puttalam to Colombo, Kandy, etc.?',
+                      a: 'Yes! We offer islandwide courier delivery across all 25 districts in Sri Lanka within 1-3 business days. All rackets and equipment are packed in protective rigid cartons.'
+                    },
+                    {
+                      q: 'Do you provide professional electronic racket stringing in Sri Lanka?',
+                      a: 'Yes, our certified stringers use precision digital electronic constant-pull machines with genuine Yonex BG65, BG80, Aerobite, and Nanogy strings customized to your tension (24–30+ lbs).'
+                    },
+                    {
+                      q: 'What other sports equipment do you offer?',
+                      a: 'In addition to badminton rackets, shuttlecocks, and court shoes, we also stock English Willow cricket bats, leather balls, batting pads, tennis racquets, and sports accessories.'
+                    }
+                  ].map(({ q, a }) => (
+                    <div key={q} style={{ borderBottom: '1px solid var(--b1)', paddingBottom: 16 }}>
+                      <h4 style={{ fontFamily: 'Outfit', fontSize: 16, fontWeight: 700, color: 'var(--t1)', marginBottom: 6 }}>{q}</h4>
+                      <p style={{ fontSize: 14, color: 'var(--t3)', lineHeight: 1.65 }}>{a}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </FadeIn>
         </div>
       </section>
 

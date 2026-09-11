@@ -4,6 +4,7 @@ import { Search, SlidersHorizontal, X, ChevronDown, Package, Grid3X3, List } fro
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '@/lib/api';
 import ProductCard from '@/components/ProductCard';
+import SEO from '@/components/SEO';
 import { FALLBACK_PRODUCTS, FALLBACK_CATEGORIES } from './Home';
 
 interface Product {
@@ -271,8 +272,25 @@ export default function Shop() {
     width: '100%',
   });
 
+  const pageTitle = selCategory && selCategory !== 'All Categories'
+    ? `Buy ${selCategory} in Sri Lanka`
+    : selBrand && selBrand !== 'All Brands'
+      ? `Buy Genuine ${selBrand} Badminton & Sports Equipment in Sri Lanka`
+      : search
+        ? `Search Results for "${search}" - Badminton & Sports Sri Lanka`
+        : 'Buy Badminton Rackets, Court Shoes & Sports Equipment Sri Lanka';
+
+  const pageDesc = selCategory && selCategory !== 'All Categories'
+    ? `Explore our genuine collection of ${selCategory} in Sri Lanka. 100% authentic Yonex, Li-Ning, Victor gear with islandwide express delivery across Sri Lanka.`
+    : 'Shop genuine badminton rackets, indoor court shoes, feather shuttlecocks, cricket bats, and tennis racquets with islandwide delivery across Sri Lanka.';
+
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', position: 'relative' }}>
+      <SEO
+        title={pageTitle}
+        description={pageDesc}
+        keywords={`Buy ${selCategory || 'badminton'}, ${selBrand || 'Yonex'} Sri Lanka, badminton rackets Sri Lanka, shuttlecocks Sri Lanka, sports shop Sri Lanka, badminton price in Sri Lanka`}
+      />
 
       {/* ── PAGE BANNER ── */}
       <div style={{ position: 'relative', background: 'var(--bg-2)', borderBottom: '1px solid var(--b1)', overflow: 'hidden' }}>

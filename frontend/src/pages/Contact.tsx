@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle, MessageSquare, Instagram, Facebook } from 'lucide-react';
+import SEO from '@/components/SEO';
 
 function FadeIn({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -41,6 +42,11 @@ export default function Contact() {
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', position: 'relative' }}>
+      <SEO
+        title="Contact & Store Location - Badminton & Sports Shop Sri Lanka"
+        description="Get in touch with Wayamba Badminton Home Sri Lanka. Call or WhatsApp +94 71 444 3317 for badminton rackets, custom stringing, cricket equipment & islandwide delivery."
+        keywords="Contact Wayamba Badminton, Badminton shop phone number Sri Lanka, sports shop Puttalam, badminton delivery Sri Lanka"
+      />
       {/* ── HEADER ── */}
       <div style={{ padding: '68px 0 56px', borderBottom: '1px solid var(--b1)', background: 'var(--bg-2)', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)', width: 440, height: 220, background: 'radial-gradient(ellipse, rgba(176,28,40,0.14) 0%, transparent 70%)', pointerEvents: 'none' }} />
