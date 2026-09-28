@@ -214,7 +214,7 @@ router.get('/:id', authMiddleware_1.protect, async (req, res) => {
 });
 // @route   GET /api/orders
 // @desc    Get all orders (Admin/Staff only)
-router.get('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.get('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('orders'), async (req, res) => {
     try {
         const orders = await Order_1.default.find()
             .populate('user', 'name email')
@@ -228,7 +228,7 @@ router.get('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPE
 });
 // @route   PUT /api/orders/:id/status
 // @desc    Update order status (Admin/Staff only)
-router.put('/:id/status', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.put('/:id/status', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('orders'), async (req, res) => {
     try {
         const { status, trackingNumber, paymentStatus } = req.body;
         const order = await Order_1.default.findById(req.params.id);

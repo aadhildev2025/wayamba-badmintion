@@ -3,7 +3,7 @@ import Order from '../models/Order';
 import Product from '../models/Product';
 import Coupon from '../models/Coupon';
 import Notification from '../models/Notification';
-import { protect, optionalAuth, restrictTo, AuthRequest } from '../middleware/authMiddleware';
+import { protect, optionalAuth, restrictTo, requirePermission, AuthRequest } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -226,7 +226,7 @@ router.get('/:id', protect, async (req: AuthRequest, res: Response) => {
 
 // @route   GET /api/orders
 // @desc    Get all orders (Admin/Staff only)
-router.get('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req: AuthRequest, res: Response) => {
+router.get('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('orders'), async (req: AuthRequest, res: Response) => {
   try {
     const orders = await Order.find()
       .populate('user', 'name email')
@@ -240,7 +240,7 @@ router.get('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req: AuthReq
 
 // @route   PUT /api/orders/:id/status
 // @desc    Update order status (Admin/Staff only)
-router.put('/:id/status', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req: AuthRequest, res: Response) => {
+router.put('/:id/status', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('orders'), async (req: AuthRequest, res: Response) => {
   try {
     const { status, trackingNumber, paymentStatus } = req.body;
     const order = await Order.findById(req.params.id);

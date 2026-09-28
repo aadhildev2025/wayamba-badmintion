@@ -49,7 +49,7 @@ router.post('/validate', authMiddleware_1.protect, async (req, res) => {
 });
 // @route   GET /api/coupons
 // @desc    Get all coupons (Admin/Staff only)
-router.get('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.get('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('coupons'), async (req, res) => {
     try {
         const coupons = await Coupon_1.default.find().sort({ createdAt: -1 });
         res.json(coupons);
@@ -60,7 +60,7 @@ router.get('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPE
 });
 // @route   POST /api/coupons
 // @desc    Create a coupon (Admin/Staff only)
-router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('coupons'), async (req, res) => {
     try {
         const { code, discountType, discountValue, minOrderAmount, expiryDate, usageLimit } = req.body;
         const exists = await Coupon_1.default.findOne({ code: code.toUpperCase() });
@@ -84,7 +84,7 @@ router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUP
 });
 // @route   PUT /api/coupons/:id
 // @desc    Update a coupon (Admin/Staff only)
-router.put('/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.put('/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('coupons'), async (req, res) => {
     try {
         const coupon = await Coupon_1.default.findById(req.params.id);
         if (!coupon) {

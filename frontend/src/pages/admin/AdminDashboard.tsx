@@ -6,24 +6,35 @@ import {
   LayoutDashboard, ShoppingBag, Package, Users,
   BarChart2, LogOut, Menu, X, Plus, Bell, CheckCheck,
   TrendingUp, AlertCircle, ChevronRight,
-  CheckCircle2, ArrowUpRight
+  CheckCircle2, ArrowUpRight, Tag, Lock, ShieldCheck
 } from 'lucide-react';
 import api from '@/lib/api';
 import AdminOrders from './AdminOrders';
 import AdminProducts from './AdminProducts';
 import AdminCustomers from './AdminCustomers';
 import AdminReports from './AdminReports';
+import AdminCoupons from './AdminCoupons';
 
-const NAV = [
-  { icon: LayoutDashboard, label: 'Overview',  path: '' },
-  { icon: ShoppingBag,    label: 'Orders',    path: 'orders' },
-  { icon: Package,        label: 'Products',  path: 'products' },
-  { icon: Users,          label: 'Staff',     path: 'staff' },
-  { icon: BarChart2,      label: 'Reports',   path: 'reports' },
+interface NavItem {
+  id: string;
+  icon: any;
+  label: string;
+  path: string;
+  permission: string;
+}
+
+const ALL_NAV: NavItem[] = [
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Overview',  path: '',         permission: 'dashboard' },
+  { id: 'orders',    icon: ShoppingBag,    label: 'Orders',    path: 'orders',   permission: 'orders' },
+  { id: 'products',  icon: Package,        label: 'Products',  path: 'products', permission: 'products' },
+  { id: 'coupons',   icon: Tag,            label: 'Coupons',   path: 'coupons',  permission: 'coupons' },
+  { id: 'reports',   icon: BarChart2,      label: 'Reports',   path: 'reports',  permission: 'reports' },
+  { id: 'staff',     icon: Users,          label: 'Staff',     path: 'staff',    permission: 'staff' },
 ];
 
 /* ── Overview Panel ──────────────────────────────── */
 function Overview({ user }: { user: { name: string; role: string } }) {
+  const { hasPermission } = useAuth();
   const [summary, setSummary] = useState<any>(null);
   const [lowStock, setLowStock] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
@@ -112,40 +123,46 @@ function Overview({ user }: { user: { name: string; role: string } }) {
 
           {/* Quick Shortcuts */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <Link
-              to="products"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '12px 22px', borderRadius: 14, fontSize: 13.5, fontWeight: 800,
-                fontFamily: 'Outfit', background: 'linear-gradient(135deg, #B01C28 0%, #8A121D 100%)',
-                border: '1px solid rgba(255,255,255,0.25)', color: '#FFFFFF', textDecoration: 'none',
-                boxShadow: '0 8px 24px rgba(176,28,40,0.45)'
-              }}
-            >
-              <Plus size={16} /> Add Product
-            </Link>
-            <Link
-              to="orders"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '12px 22px', borderRadius: 14, fontSize: 13.5, fontWeight: 700,
-                fontFamily: 'Outfit', background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.15)', color: '#FFFFFF', textDecoration: 'none'
-              }}
-            >
-              <ShoppingBag size={16} /> Manage Orders
-            </Link>
-            <Link
-              to="reports"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '12px 22px', borderRadius: 14, fontSize: 13.5, fontWeight: 700,
-                fontFamily: 'Outfit', background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.15)', color: '#FFFFFF', textDecoration: 'none'
-              }}
-            >
-              <BarChart2 size={16} /> Analytics
-            </Link>
+            {hasPermission('products') && (
+              <Link
+                to="products"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '12px 22px', borderRadius: 14, fontSize: 13.5, fontWeight: 800,
+                  fontFamily: 'Outfit', background: 'linear-gradient(135deg, #B01C28 0%, #8A121D 100%)',
+                  border: '1px solid rgba(255,255,255,0.25)', color: '#FFFFFF', textDecoration: 'none',
+                  boxShadow: '0 8px 24px rgba(176,28,40,0.45)'
+                }}
+              >
+                <Plus size={16} /> Add Product
+              </Link>
+            )}
+            {hasPermission('orders') && (
+              <Link
+                to="orders"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '12px 22px', borderRadius: 14, fontSize: 13.5, fontWeight: 700,
+                  fontFamily: 'Outfit', background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.15)', color: '#FFFFFF', textDecoration: 'none'
+                }}
+              >
+                <ShoppingBag size={16} /> Manage Orders
+              </Link>
+            )}
+            {hasPermission('reports') && (
+              <Link
+                to="reports"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '12px 22px', borderRadius: 14, fontSize: 13.5, fontWeight: 700,
+                  fontFamily: 'Outfit', background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.15)', color: '#FFFFFF', textDecoration: 'none'
+                }}
+              >
+                <BarChart2 size={16} /> Analytics
+              </Link>
+            )}
           </div>
         </div>
       </motion.div>
@@ -192,9 +209,11 @@ function Overview({ user }: { user: { name: string; role: string } }) {
               </h3>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12.5, marginTop: 2 }}>Latest customer checkouts across store</p>
             </div>
-            <Link to="orders" style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--red-vivid)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'Outfit' }}>
-              View All <ArrowUpRight size={14} />
-            </Link>
+            {hasPermission('orders') && (
+              <Link to="orders" style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--red-vivid)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'Outfit' }}>
+                View All <ArrowUpRight size={14} />
+              </Link>
+            )}
           </div>
 
           {recentOrders.length === 0 ? (
@@ -309,9 +328,75 @@ function Overview({ user }: { user: { name: string; role: string } }) {
   );
 }
 
+/* ── Access Denied State Component ─────────────────── */
+function AccessDenied({ moduleName }: { moduleName: string }) {
+  const navigate = useNavigate();
+  const { user, hasPermission } = useAuth();
+
+  const firstAllowed = ALL_NAV.find(n => hasPermission(n.permission));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '65px 24px', textAlign: 'center', minHeight: '52vh',
+        background: '#111118', borderRadius: 24, border: '1.5px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.7)', maxWidth: 580, margin: '40px auto'
+      }}
+    >
+      <div style={{
+        width: 68, height: 68, borderRadius: 22,
+        background: 'rgba(239,68,68,0.12)', border: '1.5px solid rgba(239,68,68,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+        boxShadow: '0 8px 30px rgba(239,68,68,0.25)'
+      }}>
+        <Lock size={30} style={{ color: '#EF4444' }} />
+      </div>
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '4px 12px', borderRadius: 99,
+        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+        color: '#F87171', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5,
+        fontFamily: 'Outfit', marginBottom: 12
+      }}>
+        Restricted Clearance
+      </div>
+      <h2 style={{ fontFamily: 'Outfit', fontSize: 24, fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.5px', marginBottom: 10 }}>
+        Access Restricted: {moduleName}
+      </h2>
+      <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14.5, maxWidth: 440, lineHeight: 1.6, marginBottom: 26, fontFamily: 'Inter' }}>
+        Your staff profile (<strong>{user?.name}</strong>) does not have clearance permissions to view or manage the <span style={{ color: '#FFFFFF', fontWeight: 700 }}>{moduleName}</span> module.
+      </p>
+      {firstAllowed ? (
+        <button
+          onClick={() => navigate(firstAllowed.path)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '12px 26px', borderRadius: 14,
+            background: 'linear-gradient(135deg, #B01C28 0%, #8A121D 100%)',
+            border: '1px solid rgba(255,255,255,0.25)', color: '#FFFFFF',
+            fontFamily: 'Outfit', fontSize: 13.5, fontWeight: 800, cursor: 'pointer',
+            boxShadow: '0 8px 24px rgba(176,28,40,0.45)', transition: 'all 0.2s'
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = 'none'}
+        >
+          Go to {firstAllowed.label} Module
+        </button>
+      ) : (
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+          Please contact your Super Administrator to assign module permissions.
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 /* ── Main Dashboard Shell ──────────────────────────── */
 export default function AdminDashboard() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -319,6 +404,23 @@ export default function AdminDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
+
+  const basePath = '/admin/dashboard';
+  const sub = location.pathname.replace(basePath, '').replace(/^\//, '');
+
+  const visibleNav = ALL_NAV.filter(item => hasPermission(item.permission));
+
+  // If staff lands on index root '' without 'dashboard' permission, redirect to their first authorized module
+  useEffect(() => {
+    if (!isLoading && user && user.role === 'STAFF') {
+      if (sub === '' && !hasPermission('dashboard')) {
+        const first = visibleNav[0];
+        if (first && first.path !== '') {
+          navigate(first.path, { replace: true });
+        }
+      }
+    }
+  }, [user, isLoading, sub, visibleNav, navigate, hasPermission]);
 
   const fetchNotifications = async () => {
     try {
@@ -371,8 +473,6 @@ export default function AdminDashboard() {
   );
 
   const handleLogout = () => { logout(); navigate('/admin'); };
-  const basePath = '/admin/dashboard';
-  const sub = location.pathname.replace(basePath, '').replace(/^\//, '');
 
   return (
     <div className="admin-root" style={{ minHeight: '100vh', display: 'flex', background: '#060609', color: '#F1F5F9', fontFamily: 'Inter, sans-serif' }}>
@@ -414,28 +514,34 @@ export default function AdminDashboard() {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {NAV.map(({ icon: Icon, label, path }) => {
-            const active = sub === path || (path === '' && sub === '');
-            return (
-              <Link key={path} to={path} style={{
-                display: 'flex', alignItems: 'center', gap: 11,
-                padding: '11px 14px', borderRadius: 12, textDecoration: 'none',
-                color: active ? '#fff' : 'rgba(255,255,255,0.6)',
-                background: active ? 'rgba(176,28,40,0.22)' : 'transparent',
-                fontSize: 14, fontWeight: active ? 700 : 500,
-                border: active ? '1px solid rgba(176,28,40,0.45)' : '1px solid transparent',
-                transition: 'all 0.18s var(--ease)',
-                fontFamily: 'Outfit',
-              }}
-                onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLElement).style.color = '#fff'; } }}
-                onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)'; } }}
-              >
-                <Icon size={16} style={{ color: active ? 'var(--red-vivid)' : 'inherit' }} />
-                {label}
-                {active && <ChevronRight size={13} style={{ marginLeft: 'auto', color: 'var(--red-vivid)' }} />}
-              </Link>
-            );
-          })}
+          {visibleNav.length === 0 ? (
+            <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12.5, fontFamily: 'Outfit' }}>
+              No modules permitted. Contact administrator.
+            </div>
+          ) : (
+            visibleNav.map(({ icon: Icon, label, path }) => {
+              const active = sub === path || (path === '' && sub === '');
+              return (
+                <Link key={path} to={path} style={{
+                  display: 'flex', alignItems: 'center', gap: 11,
+                  padding: '11px 14px', borderRadius: 12, textDecoration: 'none',
+                  color: active ? '#fff' : 'rgba(255,255,255,0.6)',
+                  background: active ? 'rgba(176,28,40,0.22)' : 'transparent',
+                  fontSize: 14, fontWeight: active ? 700 : 500,
+                  border: active ? '1px solid rgba(176,28,40,0.45)' : '1px solid transparent',
+                  transition: 'all 0.18s var(--ease)',
+                  fontFamily: 'Outfit',
+                }}
+                  onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLElement).style.color = '#fff'; } }}
+                  onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)'; } }}
+                >
+                  <Icon size={16} style={{ color: active ? 'var(--red-vivid)' : 'inherit' }} />
+                  {label}
+                  {active && <ChevronRight size={13} style={{ marginLeft: 'auto', color: 'var(--red-vivid)' }} />}
+                </Link>
+              );
+            })
+          )}
         </nav>
 
         {/* User + Logout */}
@@ -446,7 +552,17 @@ export default function AdminDashboard() {
             </div>
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Outfit' }}>{user.name}</div>
-              <div style={{ fontSize: 9.5, color: 'var(--red-vivid)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>{user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Staff Member'}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                {user.role === 'SUPER_ADMIN' ? (
+                  <span style={{ fontSize: 9.5, color: '#F59E0B', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <ShieldCheck size={11} /> Super Admin
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 9.5, color: '#60A5FA', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <ShieldCheck size={11} /> Staff ({visibleNav.length} Modules)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <button onClick={handleLogout} style={{
@@ -578,12 +694,14 @@ export default function AdminDashboard() {
         {/* Content */}
         <main style={{ flex: 1, padding: '32px 28px', background: '#060609' }}>
           <Routes>
-            <Route index element={<Overview user={user} />} />
-            <Route path="orders"    element={<AdminOrders />} />
-            <Route path="products"  element={<AdminProducts />} />
-            <Route path="staff"     element={<AdminCustomers />} />
-            <Route path="customers" element={<AdminCustomers />} />
-            <Route path="reports"   element={<AdminReports />} />
+            <Route index element={hasPermission('dashboard') ? <Overview user={user} /> : <AccessDenied moduleName="Dashboard Overview" />} />
+            <Route path="orders"    element={hasPermission('orders') ? <AdminOrders /> : <AccessDenied moduleName="Orders & Fulfillment" />} />
+            <Route path="products"  element={hasPermission('products') ? <AdminProducts /> : <AccessDenied moduleName="Products & Inventory" />} />
+            <Route path="coupons"   element={hasPermission('coupons') ? <AdminCoupons /> : <AccessDenied moduleName="Coupons & Discounts" />} />
+            <Route path="staff"     element={hasPermission('staff') ? <AdminCustomers /> : <AccessDenied moduleName="Staff Accounts" />} />
+            <Route path="customers" element={hasPermission('staff') ? <AdminCustomers /> : <AccessDenied moduleName="Staff Accounts" />} />
+            <Route path="reports"   element={hasPermission('reports') ? <AdminReports /> : <AccessDenied moduleName="Analytics & Reports" />} />
+            <Route path="*"         element={<AccessDenied moduleName="Requested Page" />} />
           </Routes>
         </main>
       </div>

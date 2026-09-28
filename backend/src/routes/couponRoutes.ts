@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import Coupon from '../models/Coupon';
-import { protect, restrictTo, AuthRequest } from '../middleware/authMiddleware';
+import { protect, restrictTo, requirePermission, AuthRequest } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -53,7 +53,7 @@ router.post('/validate', protect, async (req: AuthRequest, res: Response) => {
 
 // @route   GET /api/coupons
 // @desc    Get all coupons (Admin/Staff only)
-router.get('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req: AuthRequest, res: Response) => {
+router.get('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('coupons'), async (req: AuthRequest, res: Response) => {
   try {
     const coupons = await Coupon.find().sort({ createdAt: -1 });
     res.json(coupons);
@@ -64,7 +64,7 @@ router.get('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req: AuthReq
 
 // @route   POST /api/coupons
 // @desc    Create a coupon (Admin/Staff only)
-router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req: AuthRequest, res: Response) => {
+router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('coupons'), async (req: AuthRequest, res: Response) => {
   try {
     const { code, discountType, discountValue, minOrderAmount, expiryDate, usageLimit } = req.body;
 
@@ -91,7 +91,7 @@ router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req: AuthRe
 
 // @route   PUT /api/coupons/:id
 // @desc    Update a coupon (Admin/Staff only)
-router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('coupons'), async (req: AuthRequest, res: Response) => {
   try {
     const coupon = await Coupon.findById(req.params.id);
     if (!coupon) {

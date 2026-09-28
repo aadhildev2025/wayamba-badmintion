@@ -3,8 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.restrictTo = exports.optionalAuth = exports.protect = void 0;
+exports.requirePermission = exports.restrictTo = exports.optionalAuth = exports.protect = exports.ALL_PERMISSIONS = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const User_1 = __importDefault(require("../models/User"));
+exports.ALL_PERMISSIONS = ['dashboard', 'products', 'orders', 'reports', 'coupons', 'staff'];
 const protect = async (req, res, next) => {
     let token;
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -15,11 +17,19 @@ const protect = async (req, res, next) => {
         return;
     }
     if (token === 'demo_admin_jwt_token_999') {
-        req.user = { id: '650000000000000000000001', role: 'SUPER_ADMIN' };
+        req.user = {
+            id: '650000000000000000000001',
+            role: 'SUPER_ADMIN',
+            permissions: exports.ALL_PERMISSIONS,
+        };
         return next();
     }
     if (token === 'demo_staff_jwt_token_888') {
-        req.user = { id: '650000000000000000000002', role: 'STAFF' };
+        req.user = {
+            id: '650000000000000000000002',
+            role: 'STAFF',
+            permissions: ['dashboard', 'products', 'orders'],
+        };
         return next();
     }
     try {
@@ -27,6 +37,7 @@ const protect = async (req, res, next) => {
         req.user = {
             id: decoded.id,
             role: decoded.role,
+            permissions: decoded.permissions || [],
         };
         next();
     }
@@ -42,10 +53,18 @@ const optionalAuth = async (req, res, next) => {
     }
     if (token) {
         if (token === 'demo_admin_jwt_token_999') {
-            req.user = { id: '650000000000000000000001', role: 'SUPER_ADMIN' };
+            req.user = {
+                id: '650000000000000000000001',
+                role: 'SUPER_ADMIN',
+                permissions: exports.ALL_PERMISSIONS,
+            };
         }
         else if (token === 'demo_staff_jwt_token_888') {
-            req.user = { id: '650000000000000000000002', role: 'STAFF' };
+            req.user = {
+                id: '650000000000000000000002',
+                role: 'STAFF',
+                permissions: ['dashboard', 'products', 'orders'],
+            };
         }
         else {
             try {
@@ -53,6 +72,7 @@ const optionalAuth = async (req, res, next) => {
                 req.user = {
                     id: decoded.id,
                     role: decoded.role,
+                    permissions: decoded.permissions || [],
                 };
             }
             catch (error) {
@@ -73,3 +93,38 @@ const restrictTo = (...roles) => {
     };
 };
 exports.restrictTo = restrictTo;
+const requirePermission = (permission) => {
+    return async (req, res, next) => {
+        if (!req.user) {
+            res.status(401).json({ message: 'Not authorized, no user context' });
+            return;
+        }
+        // Super Admin has unrestricted access to all endpoints
+        if (req.user.role === 'SUPER_ADMIN') {
+            return next();
+        }
+        if (req.user.role === 'STAFF') {
+            let userPermissions = req.user.permissions;
+            if (!userPermissions || userPermissions.length === 0) {
+                try {
+                    const dbUser = await User_1.default.findById(req.user.id).select('permissions');
+                    userPermissions = dbUser?.permissions || [];
+                    req.user.permissions = userPermissions;
+                }
+                catch (err) {
+                    userPermissions = [];
+                }
+            }
+            if (userPermissions.includes(permission)) {
+                return next();
+            }
+            res.status(403).json({
+                message: `Forbidden: Staff member lacks '${permission}' permission`,
+                requiredPermission: permission,
+            });
+            return;
+        }
+        res.status(403).json({ message: `Forbidden: role '${req.user.role}' lacks administrative permissions` });
+    };
+};
+exports.requirePermission = requirePermission;

@@ -9,6 +9,7 @@ export interface IUser extends Document {
   phone?: string;
   verified: boolean;
   wishlist: mongoose.Types.ObjectId[];
+  permissions?: string[];
   createdAt: Date;
   comparePassword(password: string): Promise<boolean>;
 }
@@ -22,6 +23,10 @@ const UserSchema: Schema = new Schema(
     phone: { type: String, default: '' },
     verified: { type: Boolean, default: false },
     wishlist: [{ type: Schema.Types.ObjectId, ref: 'Product' }],
+    permissions: {
+      type: [String],
+      default: ['dashboard', 'products', 'orders'],
+    },
   },
   { timestamps: true }
 );

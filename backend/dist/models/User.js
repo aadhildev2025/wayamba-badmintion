@@ -46,6 +46,10 @@ const UserSchema = new mongoose_1.Schema({
     phone: { type: String, default: '' },
     verified: { type: Boolean, default: false },
     wishlist: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'Product' }],
+    permissions: {
+        type: [String],
+        default: ['dashboard', 'products', 'orders'],
+    },
 }, { timestamps: true });
 // Pre-save hook to hash password
 UserSchema.pre('save', async function (next) {

@@ -3,7 +3,7 @@ import Product from '../models/Product';
 import Category from '../models/Category';
 import Brand from '../models/Brand';
 import Review from '../models/Review';
-import { protect, optionalAuth, restrictTo, AuthRequest } from '../middleware/authMiddleware';
+import { protect, optionalAuth, restrictTo, requirePermission, AuthRequest } from '../middleware/authMiddleware';
 import { upload, uploadToCloudinary, isCloudinaryReady } from '../middleware/uploadMiddleware';
 import path from 'path';
 import fs from 'fs';
@@ -104,7 +104,7 @@ router.get('/categories', async (req, res) => {
 });
 
 // POST create category (Super Admin & Staff)
-router.post('/categories', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.post('/categories', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('products'), async (req, res) => {
   try {
     const { name, icon } = req.body;
     if (!name || !name.trim()) {
@@ -151,7 +151,7 @@ router.post('/categories', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (r
 });
 
 // DELETE category (Super Admin & Staff)
-router.delete('/categories/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.delete('/categories/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('products'), async (req, res) => {
   try {
     const { id } = req.params;
     let deletedDoc = null;
@@ -189,7 +189,7 @@ router.get('/brands', async (req, res) => {
 });
 
 // POST create brand (Super Admin & Staff)
-router.post('/brands', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.post('/brands', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('products'), async (req, res) => {
   try {
     const { name, logo } = req.body;
     if (!name || !name.trim()) {
@@ -239,7 +239,7 @@ router.post('/brands', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, 
 });
 
 // DELETE brand (Super Admin & Staff)
-router.delete('/brands/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.delete('/brands/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('products'), async (req, res) => {
   try {
     const { id } = req.params;
     let deletedDoc = null;
@@ -412,7 +412,7 @@ router.get('/:idOrSlug/reviews', async (req, res) => {
 });
 
 // POST upload multiple images (Cloudinary CDN with local/base64 fallback)
-router.post('/upload', protect, restrictTo('SUPER_ADMIN', 'STAFF'), (req, res) => {
+router.post('/upload', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('products'), (req, res) => {
   upload.array('images', 10)(req, res, async (err: any) => {
     if (err) {
       console.error('Multer upload error:', err);
@@ -513,7 +513,7 @@ async function resolveCategory(categoryInput: any): Promise<mongoose.Types.Objec
 }
 
 // POST create product (Super Admin & Staff)
-router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('products'), async (req, res) => {
   const {
     name, sku, description, price, salePrice,
     hasCasePricing, casePrice, caseSalePrice, caseUnitsCount, piecePrice, pieceSalePrice,
@@ -595,7 +595,7 @@ router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) =
 });
 
 // PUT update product (Super Admin & Staff)
-router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission('products'), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) {

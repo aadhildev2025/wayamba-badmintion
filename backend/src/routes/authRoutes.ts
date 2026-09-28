@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
-import { protect, restrictTo, AuthRequest } from '../middleware/authMiddleware';
+import { protect, restrictTo, AuthRequest, ALL_PERMISSIONS } from '../middleware/authMiddleware';
 
 const router = Router();
 
-const generateToken = (id: string, role: string): string => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET || 'super_secret_badminton_key_123!', {
+const generateToken = (id: string, role: string, permissions: string[] = []): string => {
+  return jwt.sign({ id, role, permissions }, process.env.JWT_SECRET || 'super_secret_badminton_key_123!', {
     expiresIn: '30d',
   });
 };
@@ -29,16 +29,18 @@ router.post('/register', async (req, res) => {
       password,
       phone,
       role: 'CUSTOMER',
+      permissions: [],
     });
 
     res.status(201).json({
-      token: generateToken(user._id.toString(), user.role),
+      token: generateToken(user._id.toString(), user.role, []),
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         phone: user.phone,
+        permissions: [],
       },
     });
   } catch (error: any) {
@@ -64,14 +66,19 @@ router.post('/login', async (req, res) => {
       return;
     }
 
+    const userPermissions = user.permissions && user.permissions.length > 0
+      ? user.permissions
+      : (user.role === 'SUPER_ADMIN' ? ALL_PERMISSIONS : ['dashboard', 'products', 'orders']);
+
     res.json({
-      token: generateToken(user._id.toString(), user.role),
+      token: generateToken(user._id.toString(), user.role, userPermissions),
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         phone: user.phone,
+        permissions: userPermissions,
       },
     });
   } catch (error: any) {
@@ -88,7 +95,11 @@ router.get('/me', protect, async (req: AuthRequest, res: Response) => {
       res.status(404).json({ message: 'User not found' });
       return;
     }
-    res.json(user);
+    const userObj = user.toObject();
+    if (!userObj.permissions || userObj.permissions.length === 0) {
+      userObj.permissions = user.role === 'SUPER_ADMIN' ? ALL_PERMISSIONS : ['dashboard', 'products', 'orders'];
+    }
+    res.json(userObj);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -117,6 +128,7 @@ router.put('/profile', protect, async (req: AuthRequest, res: Response) => {
       email: updatedUser.email,
       role: updatedUser.role,
       phone: updatedUser.phone,
+      permissions: updatedUser.permissions || [],
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -201,16 +213,16 @@ router.delete('/staff/:id', protect, restrictTo('SUPER_ADMIN'), async (req: Auth
 // @desc    Get all staff members (Super Admin only)
 router.get('/staff', protect, restrictTo('SUPER_ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const staff = await User.find({ role: { $ne: 'CUSTOMER' } }).select('-password');
+    const staff = await User.find({ role: { $ne: 'CUSTOMER' } }).select('-password').sort({ createdAt: -1 });
     res.json(staff.length > 0 ? staff : [
-      { _id: '650000000000000000000001', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317' },
-      { _id: '650000000000000000000002', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567' }
+      { _id: '650000000000000000000001', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317', permissions: ALL_PERMISSIONS },
+      { _id: '650000000000000000000002', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567', permissions: ['dashboard', 'products', 'orders'] }
     ]);
   } catch (error: any) {
     console.error('Error fetching staff from DB, returning fallback staff:', error.message);
     res.json([
-      { _id: '650000000000000000000001', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317' },
-      { _id: '650000000000000000000002', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567' }
+      { _id: '650000000000000000000001', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317', permissions: ALL_PERMISSIONS },
+      { _id: '650000000000000000000002', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567', permissions: ['dashboard', 'products', 'orders'] }
     ]);
   }
 });
@@ -219,7 +231,7 @@ router.get('/staff', protect, restrictTo('SUPER_ADMIN'), async (req: AuthRequest
 // @desc    Create staff member (Super Admin only)
 router.post('/staff', protect, restrictTo('SUPER_ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, email, password, role, phone } = req.body;
+    const { name, email, password, role, phone, permissions } = req.body;
     if (role === 'SUPER_ADMIN') {
       res.status(400).json({ message: 'Cannot create additional Super Admin accounts' });
       return;
@@ -231,21 +243,72 @@ router.post('/staff', protect, restrictTo('SUPER_ADMIN'), async (req: AuthReques
       return;
     }
 
+    // Default permissions if none provided
+    const assignedPermissions = Array.isArray(permissions) && permissions.length > 0
+      ? permissions
+      : ['dashboard', 'products', 'orders'];
+
     const staff = await User.create({
       name,
       email,
       password,
       role: role || 'STAFF',
       phone,
+      permissions: assignedPermissions,
       verified: true
     });
 
     res.status(201).json({
+      _id: staff._id,
       id: staff._id,
       name: staff.name,
       email: staff.email,
       role: staff.role,
       phone: staff.phone,
+      permissions: staff.permissions,
+      createdAt: staff.createdAt,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   PUT /api/auth/staff/:id/permissions
+// @desc    Update access permissions for a specific staff member (Super Admin only)
+router.put('/staff/:id/permissions', protect, restrictTo('SUPER_ADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { permissions } = req.body;
+    if (!Array.isArray(permissions)) {
+      res.status(400).json({ message: 'Permissions must be an array of module keys' });
+      return;
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      res.status(404).json({ message: 'Staff member not found' });
+      return;
+    }
+
+    if (user.role === 'SUPER_ADMIN') {
+      res.status(400).json({ message: 'Super Admin clearance is immutable and includes all modules' });
+      return;
+    }
+
+    user.permissions = permissions;
+    await user.save();
+
+    res.json({
+      message: 'Staff permissions updated successfully',
+      staff: {
+        _id: user._id,
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        permissions: user.permissions,
+        createdAt: user.createdAt,
+      },
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

@@ -8,8 +8,8 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = __importDefault(require("../models/User"));
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const router = (0, express_1.Router)();
-const generateToken = (id, role) => {
-    return jsonwebtoken_1.default.sign({ id, role }, process.env.JWT_SECRET || 'super_secret_badminton_key_123!', {
+const generateToken = (id, role, permissions = []) => {
+    return jsonwebtoken_1.default.sign({ id, role, permissions }, process.env.JWT_SECRET || 'super_secret_badminton_key_123!', {
         expiresIn: '30d',
     });
 };
@@ -29,15 +29,17 @@ router.post('/register', async (req, res) => {
             password,
             phone,
             role: 'CUSTOMER',
+            permissions: [],
         });
         res.status(201).json({
-            token: generateToken(user._id.toString(), user.role),
+            token: generateToken(user._id.toString(), user.role, []),
             user: {
                 id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
                 phone: user.phone,
+                permissions: [],
             },
         });
     }
@@ -60,14 +62,18 @@ router.post('/login', async (req, res) => {
             res.status(400).json({ message: 'Invalid email or password' });
             return;
         }
+        const userPermissions = user.permissions && user.permissions.length > 0
+            ? user.permissions
+            : (user.role === 'SUPER_ADMIN' ? authMiddleware_1.ALL_PERMISSIONS : ['dashboard', 'products', 'orders']);
         res.json({
-            token: generateToken(user._id.toString(), user.role),
+            token: generateToken(user._id.toString(), user.role, userPermissions),
             user: {
                 id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
                 phone: user.phone,
+                permissions: userPermissions,
             },
         });
     }
@@ -84,7 +90,11 @@ router.get('/me', authMiddleware_1.protect, async (req, res) => {
             res.status(404).json({ message: 'User not found' });
             return;
         }
-        res.json(user);
+        const userObj = user.toObject();
+        if (!userObj.permissions || userObj.permissions.length === 0) {
+            userObj.permissions = user.role === 'SUPER_ADMIN' ? authMiddleware_1.ALL_PERMISSIONS : ['dashboard', 'products', 'orders'];
+        }
+        res.json(userObj);
     }
     catch (error) {
         res.status(500).json({ message: error.message });
@@ -111,6 +121,7 @@ router.put('/profile', authMiddleware_1.protect, async (req, res) => {
             email: updatedUser.email,
             role: updatedUser.role,
             phone: updatedUser.phone,
+            permissions: updatedUser.permissions || [],
         });
     }
     catch (error) {
@@ -194,17 +205,17 @@ router.delete('/staff/:id', authMiddleware_1.protect, (0, authMiddleware_1.restr
 // @desc    Get all staff members (Super Admin only)
 router.get('/staff', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN'), async (req, res) => {
     try {
-        const staff = await User_1.default.find({ role: { $ne: 'CUSTOMER' } }).select('-password');
+        const staff = await User_1.default.find({ role: { $ne: 'CUSTOMER' } }).select('-password').sort({ createdAt: -1 });
         res.json(staff.length > 0 ? staff : [
-            { _id: '650000000000000000000001', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317' },
-            { _id: '650000000000000000000002', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567' }
+            { _id: '650000000000000000000001', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317', permissions: authMiddleware_1.ALL_PERMISSIONS },
+            { _id: '650000000000000000000002', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567', permissions: ['dashboard', 'products', 'orders'] }
         ]);
     }
     catch (error) {
         console.error('Error fetching staff from DB, returning fallback staff:', error.message);
         res.json([
-            { _id: '650000000000000000000001', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317' },
-            { _id: '650000000000000000000002', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567' }
+            { _id: '650000000000000000000001', name: 'Super Admin', email: 'admin@wbh.com', role: 'SUPER_ADMIN', phone: '+94 71 444 3317', permissions: authMiddleware_1.ALL_PERMISSIONS },
+            { _id: '650000000000000000000002', name: 'Sales Staff', email: 'staff@wbh.com', role: 'STAFF', phone: '+94 77 123 4567', permissions: ['dashboard', 'products', 'orders'] }
         ]);
     }
 });
@@ -212,7 +223,7 @@ router.get('/staff', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)(
 // @desc    Create staff member (Super Admin only)
 router.post('/staff', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN'), async (req, res) => {
     try {
-        const { name, email, password, role, phone } = req.body;
+        const { name, email, password, role, phone, permissions } = req.body;
         if (role === 'SUPER_ADMIN') {
             res.status(400).json({ message: 'Cannot create additional Super Admin accounts' });
             return;
@@ -222,20 +233,66 @@ router.post('/staff', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)
             res.status(400).json({ message: 'User already exists' });
             return;
         }
+        // Default permissions if none provided
+        const assignedPermissions = Array.isArray(permissions) && permissions.length > 0
+            ? permissions
+            : ['dashboard', 'products', 'orders'];
         const staff = await User_1.default.create({
             name,
             email,
             password,
             role: role || 'STAFF',
             phone,
+            permissions: assignedPermissions,
             verified: true
         });
         res.status(201).json({
+            _id: staff._id,
             id: staff._id,
             name: staff.name,
             email: staff.email,
             role: staff.role,
             phone: staff.phone,
+            permissions: staff.permissions,
+            createdAt: staff.createdAt,
+        });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+// @route   PUT /api/auth/staff/:id/permissions
+// @desc    Update access permissions for a specific staff member (Super Admin only)
+router.put('/staff/:id/permissions', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN'), async (req, res) => {
+    try {
+        const { permissions } = req.body;
+        if (!Array.isArray(permissions)) {
+            res.status(400).json({ message: 'Permissions must be an array of module keys' });
+            return;
+        }
+        const user = await User_1.default.findById(req.params.id);
+        if (!user) {
+            res.status(404).json({ message: 'Staff member not found' });
+            return;
+        }
+        if (user.role === 'SUPER_ADMIN') {
+            res.status(400).json({ message: 'Super Admin clearance is immutable and includes all modules' });
+            return;
+        }
+        user.permissions = permissions;
+        await user.save();
+        res.json({
+            message: 'Staff permissions updated successfully',
+            staff: {
+                _id: user._id,
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                phone: user.phone,
+                permissions: user.permissions,
+                createdAt: user.createdAt,
+            },
         });
     }
     catch (error) {

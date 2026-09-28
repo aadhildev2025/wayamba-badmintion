@@ -104,7 +104,7 @@ router.get('/categories', async (req, res) => {
     }
 });
 // POST create category (Super Admin & Staff)
-router.post('/categories', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.post('/categories', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('products'), async (req, res) => {
     try {
         const { name, icon } = req.body;
         if (!name || !name.trim()) {
@@ -149,7 +149,7 @@ router.post('/categories', authMiddleware_1.protect, (0, authMiddleware_1.restri
     }
 });
 // DELETE category (Super Admin & Staff)
-router.delete('/categories/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.delete('/categories/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('products'), async (req, res) => {
     try {
         const { id } = req.params;
         let deletedDoc = null;
@@ -185,7 +185,7 @@ router.get('/brands', async (req, res) => {
     }
 });
 // POST create brand (Super Admin & Staff)
-router.post('/brands', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.post('/brands', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('products'), async (req, res) => {
     try {
         const { name, logo } = req.body;
         if (!name || !name.trim()) {
@@ -230,7 +230,7 @@ router.post('/brands', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo
     }
 });
 // DELETE brand (Super Admin & Staff)
-router.delete('/brands/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.delete('/brands/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('products'), async (req, res) => {
     try {
         const { id } = req.params;
         let deletedDoc = null;
@@ -391,7 +391,7 @@ router.get('/:idOrSlug/reviews', async (req, res) => {
     }
 });
 // POST upload multiple images (Cloudinary CDN with local/base64 fallback)
-router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (req, res) => {
+router.post('/upload', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('products'), (req, res) => {
     uploadMiddleware_1.upload.array('images', 10)(req, res, async (err) => {
         if (err) {
             console.error('Multer upload error:', err);
@@ -491,7 +491,7 @@ async function resolveCategory(categoryInput) {
     return catDoc._id;
 }
 // POST create product (Super Admin & Staff)
-router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('products'), async (req, res) => {
     const { name, sku, description, price, salePrice, hasCasePricing, casePrice, caseSalePrice, caseUnitsCount, piecePrice, pieceSalePrice, hasColors, colors, stockQuantity, images, brand, category, status, tags, isFeatured, specifications } = req.body;
     const slug = (name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
     try {
@@ -563,7 +563,7 @@ router.post('/', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUP
     }
 });
 // PUT update product (Super Admin & Staff)
-router.put('/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+router.put('/:id', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), (0, authMiddleware_1.requirePermission)('products'), async (req, res) => {
     try {
         const product = await Product_1.default.findById(req.params.id);
         if (!product) {

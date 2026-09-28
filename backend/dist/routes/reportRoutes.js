@@ -12,6 +12,13 @@ const router = (0, express_1.Router)();
 // @route   GET /api/reports/dashboard
 // @desc    Get dashboard metrics & analytics (Admin/Staff only)
 router.get('/dashboard', authMiddleware_1.protect, (0, authMiddleware_1.restrictTo)('SUPER_ADMIN', 'STAFF'), async (req, res) => {
+    if (req.user?.role === 'STAFF') {
+        const permissions = req.user.permissions || [];
+        if (!permissions.includes('dashboard') && !permissions.includes('reports')) {
+            res.status(403).json({ message: "Forbidden: Staff member lacks 'dashboard' or 'reports' permission" });
+            return;
+        }
+    }
     try {
         // 1. Core Counts & Metrics
         const totalOrders = await Order_1.default.countDocuments();
