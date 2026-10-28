@@ -20,6 +20,8 @@ interface ProductQuickViewProps {
     pieceSalePrice?: number;
     hasColors?: boolean;
     colors?: string[];
+    hasSizes?: boolean;
+    sizes?: string[];
     images?: (string | { url: string })[];
     brand?: { name: string };
     category?: { name: string };
@@ -38,6 +40,7 @@ export default function ProductQuickViewModal({ product, isOpen, onClose }: Prod
   const navigate = useNavigate();
   const [selectedUnit, setSelectedUnit] = useState<'piece' | 'case'>('piece');
   const [selectedColor, setSelectedColor] = useState<string>(() => (product?.colors?.[0] || ''));
+  const [selectedSize, setSelectedSize] = useState<string>(() => (product?.sizes?.[0] || ''));
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [activeImgIdx, setActiveImgIdx] = useState(0);
@@ -67,13 +70,15 @@ export default function ProductQuickViewModal({ product, isOpen, onClose }: Prod
       ? `Case (${product.caseUnitsCount || 12} pcs)`
       : (product.hasCasePricing ? 'Single Piece' : '');
     
+    const sizeLabel = product.sizes && product.sizes.length > 0 ? (selectedSize || product.sizes[0]) : '';
     const colorLabel = product.hasColors && selectedColor ? selectedColor : '';
-    const detailsSuffix = [colorLabel, unitLabel].filter(Boolean).join(' - ');
+    const detailsSuffix = [sizeLabel ? `Size: ${sizeLabel}` : '', colorLabel, unitLabel].filter(Boolean).join(' - ');
     const itemName = detailsSuffix ? `${product.name} (${detailsSuffix})` : product.name;
 
+    const sizeKey = sizeLabel ? `-${sizeLabel.toLowerCase().replace(/\s+/g, '-')}` : '';
     const colorKey = colorLabel ? `-${colorLabel.toLowerCase().replace(/\s+/g, '-')}` : '';
     const unitKey = isCase ? '-case' : (product.hasCasePricing ? '-piece' : '');
-    const cartItemId = `${product._id}${colorKey}${unitKey}`;
+    const cartItemId = `${product._id}${sizeKey}${colorKey}${unitKey}`;
 
     addToCart({
       _id: cartItemId,
@@ -83,6 +88,7 @@ export default function ProductQuickViewModal({ product, isOpen, onClose }: Prod
       quantity: qty,
       brand: product.brand,
       selectedColor: colorLabel || undefined,
+      selectedSize: sizeLabel || undefined,
       selectedUnit: unitLabel || undefined,
       stockQuantity: product.stockQuantity ?? 10
     });
@@ -273,6 +279,52 @@ export default function ProductQuickViewModal({ product, isOpen, onClose }: Prod
                         Rs. {(product.caseSalePrice || product.casePrice).toLocaleString()}
                       </div>
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Size Variants (if configured) */}
+              {product.sizes && product.sizes.length > 0 && (
+                <div style={{ background: '#12121C', padding: '12px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: 'Outfit' }}>
+                      Choose Size:
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--red-vivid)', fontFamily: 'Outfit' }}>
+                      {selectedSize ? `Size: ${selectedSize}` : `${product.sizes.length} Sizes`}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {product.sizes.map(sz => {
+                      const isSelected = (selectedSize || product.sizes?.[0]) === sz;
+
+                      return (
+                        <button
+                          key={sz}
+                          type="button"
+                          onClick={() => setSelectedSize(sz)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            fontWeight: isSelected ? 900 : 700,
+                            fontFamily: 'Outfit',
+                            background: isSelected ? 'rgba(176,28,40,0.2)' : 'rgba(255,255,255,0.04)',
+                            border: isSelected ? '1.5px solid var(--red-vivid)' : '1px solid rgba(255,255,255,0.1)',
+                            color: isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            boxShadow: isSelected ? '0 0 10px rgba(176,28,40,0.35)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isSelected && <Check size={12} strokeWidth={3} style={{ color: 'var(--red-vivid)' }} />}
+                          <span>{sz}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

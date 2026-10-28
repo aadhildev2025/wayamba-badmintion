@@ -367,7 +367,14 @@ export default function Checkout() {
                       <img src={img} alt={item.name} style={{ width: 50, height: 50, borderRadius: 10, objectFit: 'cover', background: '#14141E', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontFamily: 'Outfit', fontSize: 13.5, fontWeight: 800, color: '#fff', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{item.quantity} × Rs. {price.toLocaleString()}</div>
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span>{item.quantity} × Rs. {price.toLocaleString()}</span>
+                          {item.selectedSize && (
+                            <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: 'rgba(56,189,248,0.15)', color: '#38BDF8', border: '1px solid rgba(56,189,248,0.3)', fontFamily: 'Outfit' }}>
+                              Size: {item.selectedSize}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div style={{ fontFamily: 'Outfit', fontSize: 14, fontWeight: 900, color: '#fff', flexShrink: 0 }}>Rs. {(price * item.quantity).toLocaleString()}</div>
                     </div>

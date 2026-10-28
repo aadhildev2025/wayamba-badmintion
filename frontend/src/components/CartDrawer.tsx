@@ -98,7 +98,14 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               <Trash2 size={15} />
                             </button>
                           </div>
-                          <span style={{ fontSize: 11, color: 'var(--red-vivid)', fontWeight: 800, fontFamily: 'Outfit' }}>{typeof item.brand === 'object' ? item.brand.name : 'WBH'}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 11, color: 'var(--red-vivid)', fontWeight: 800, fontFamily: 'Outfit' }}>{typeof item.brand === 'object' ? item.brand.name : 'WBH'}</span>
+                            {item.selectedSize && (
+                              <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: 'rgba(56,189,248,0.15)', color: '#38BDF8', border: '1px solid rgba(56,189,248,0.3)', fontFamily: 'Outfit' }}>
+                                Size: {item.selectedSize}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>

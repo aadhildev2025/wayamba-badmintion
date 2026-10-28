@@ -15,6 +15,8 @@ interface Product {
   pieceSalePrice?: number;
   hasColors?: boolean;
   colors?: string[];
+  hasSizes?: boolean;
+  sizes?: string[];
   images?: { url: string }[];
   brand?: { name: string }; category?: { name: string };
   stockQuantity: number;
@@ -54,17 +56,24 @@ export default function ProductCard({ product }: { product: Product }) {
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!inStock) return;
-    if ((product.hasCasePricing && product.casePrice) || (product.hasColors && product.colors && product.colors.length > 1)) {
+    if ((product.hasCasePricing && product.casePrice) || (product.hasColors && product.colors && product.colors.length > 1) || (product.hasSizes && product.sizes && product.sizes.length > 1)) {
       setQuickViewOpen(true);
       return;
     }
     const defaultColor = product.hasColors && product.colors?.[0] ? product.colors[0] : undefined;
+    const defaultSize = product.hasSizes && product.sizes?.[0] ? product.sizes[0] : undefined;
+    const details = [defaultSize ? `Size: ${defaultSize}` : '', defaultColor].filter(Boolean).join(' - ');
+    const itemName = details ? `${product.name} (${details})` : product.name;
+    const sizeKey = defaultSize ? `-${defaultSize.toLowerCase().replace(/\s+/g, '-')}` : '';
+    const colorKey = defaultColor ? `-${defaultColor.toLowerCase().replace(/\s+/g, '-')}` : '';
+
     addToCart({
-      _id: defaultColor ? `${product._id}-${defaultColor.toLowerCase().replace(/\s+/g, '-')}` : product._id,
-      name: defaultColor ? `${product.name} (${defaultColor})` : product.name,
+      _id: `${product._id}${sizeKey}${colorKey}`,
+      name: itemName,
       price: displayPrice,
       image: src,
-      selectedColor: defaultColor
+      selectedColor: defaultColor,
+      selectedSize: defaultSize
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);

@@ -479,12 +479,20 @@ router.post('/upload', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermi
 
 // Helper to resolve brand (by ObjectId or name)
 async function resolveBrand(brandInput: any): Promise<mongoose.Types.ObjectId> {
+  // If brandInput is an ID or name matching fallbackBrands, get the real name
+  let brandName = '';
+  if (brandInput) {
+    const fb = fallbackBrands.find(b => b._id === String(brandInput) || b.slug === String(brandInput) || b.name.toLowerCase() === String(brandInput).toLowerCase());
+    if (fb) brandName = fb.name;
+  }
+
   if (brandInput && mongoose.Types.ObjectId.isValid(brandInput)) {
     const existing = await Brand.findById(brandInput);
     if (existing) return existing._id as mongoose.Types.ObjectId;
   }
+
   // Try by name or slug
-  const cleanName = String(brandInput || fallbackBrands[0]?.name || 'Yonex').trim();
+  const cleanName = (brandName || String(brandInput || fallbackBrands[0]?.name || 'Yonex')).trim();
   const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
   let brandDoc = await Brand.findOne({
     $or: [{ slug }, { name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }]
@@ -497,11 +505,18 @@ async function resolveBrand(brandInput: any): Promise<mongoose.Types.ObjectId> {
 
 // Helper to resolve category (by ObjectId or name)
 async function resolveCategory(categoryInput: any): Promise<mongoose.Types.ObjectId> {
+  let catName = '';
+  if (categoryInput) {
+    const fc = fallbackCategories.find(c => c._id === String(categoryInput) || c.slug === String(categoryInput) || c.name.toLowerCase() === String(categoryInput).toLowerCase());
+    if (fc) catName = fc.name;
+  }
+
   if (categoryInput && mongoose.Types.ObjectId.isValid(categoryInput)) {
     const existing = await Category.findById(categoryInput);
     if (existing) return existing._id as mongoose.Types.ObjectId;
   }
-  const cleanName = String(categoryInput || fallbackCategories[0]?.name || 'Badminton Rackets').trim();
+
+  const cleanName = (catName || String(categoryInput || fallbackCategories[0]?.name || 'Badminton Rackets')).trim();
   const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
   let catDoc = await Category.findOne({
     $or: [{ slug }, { name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }]
@@ -518,78 +533,118 @@ router.post('/', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermission(
     name, sku, description, price, salePrice,
     hasCasePricing, casePrice, caseSalePrice, caseUnitsCount, piecePrice, pieceSalePrice,
     hasColors, colors,
+    hasSizes, sizes,
     stockQuantity, images, brand, category, status, tags, isFeatured, specifications
   } = req.body;
-  const slug = (name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
+
+  const baseSlug = (name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || 'product';
+  const slug = `${baseSlug}-${Date.now().toString().slice(-4)}${Math.random().toString(36).substring(2, 5)}`;
+  const cleanSku = (sku ? String(sku).trim().toUpperCase() : '') ||
+    `${(name || 'WBH').replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'WBH'}-${Date.now().toString().slice(-6)}`;
+
+  const parsedSizes = Array.isArray(sizes)
+    ? sizes.map((s: any) => String(s).trim()).filter(Boolean)
+    : (typeof sizes === 'string' && sizes ? sizes.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+  const hasSizesBool = Boolean(hasSizes || parsedSizes.length > 0);
+
+  const cleanSpecs = Array.isArray(specifications)
+    ? specifications
+        .filter((s: any) => s && typeof s === 'object' && s.key && String(s.key).trim() && s.value && String(s.value).trim())
+        .map((s: any) => ({ key: String(s.key).trim(), value: String(s.value).trim() }))
+    : [];
+
+  const finalPrice = Math.max(0, Number(price) || 0);
+  const finalStock = isNaN(Number(stockQuantity)) ? 0 : Math.max(0, Number(stockQuantity));
+  const cleanImages = Array.isArray(images) && images.length > 0
+    ? images.filter((img: any) => typeof img === 'string' && img.trim().length > 0)
+    : ['/imgs/hero_rackets.png'];
 
   try {
-    const exists = await Product.findOne({ $or: [{ sku }, { slug }] });
-    if (exists) {
-      res.status(400).json({ message: 'Product with this SKU or Name already exists' });
-      return;
+    if (mongoose.connection.readyState === 1) {
+      const exists = await Product.findOne({
+        sku: { $regex: new RegExp(`^${cleanSku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+      if (exists) {
+        return res.status(400).json({ message: `A product with SKU "${cleanSku}" already exists. Please choose a different SKU or generate one.` });
+      }
+
+      const resolvedBrandId = await resolveBrand(brand);
+      const resolvedCategoryId = await resolveCategory(category);
+
+      const product = await Product.create({
+        name: (name || 'New Product').trim(),
+        slug,
+        sku: cleanSku,
+        description: description || '',
+        price: finalPrice,
+        salePrice: salePrice !== undefined && salePrice !== '' ? Number(salePrice) : undefined,
+        hasCasePricing: Boolean(hasCasePricing),
+        casePrice: casePrice !== undefined && casePrice !== '' ? Number(casePrice) : undefined,
+        caseSalePrice: caseSalePrice !== undefined && caseSalePrice !== '' ? Number(caseSalePrice) : undefined,
+        caseUnitsCount: caseUnitsCount !== undefined && caseUnitsCount !== '' ? Number(caseUnitsCount) : 12,
+        piecePrice: piecePrice !== undefined && piecePrice !== '' ? Number(piecePrice) : finalPrice,
+        pieceSalePrice: pieceSalePrice !== undefined && pieceSalePrice !== '' ? Number(pieceSalePrice) : (salePrice ? Number(salePrice) : undefined),
+        hasColors: Boolean(hasColors),
+        colors: Array.isArray(colors) ? colors : (typeof colors === 'string' && colors ? colors.split(',').map((c: string) => c.trim()).filter(Boolean) : []),
+        hasSizes: hasSizesBool,
+        sizes: parsedSizes,
+        stockQuantity: finalStock,
+        images: cleanImages.length > 0 ? cleanImages : ['/imgs/hero_rackets.png'],
+        brand: resolvedBrandId,
+        category: resolvedCategoryId,
+        status: status || 'active',
+        tags: Array.isArray(tags) ? tags : [],
+        isFeatured: Boolean(isFeatured),
+        specifications: cleanSpecs
+      });
+
+      const populated = await Product.findById(product._id).populate('brand').populate('category');
+      return res.status(201).json(populated || product);
+    } else {
+      throw new Error('Database connection is offline');
+    }
+  } catch (error: any) {
+    console.error('Error creating product in DB:', error.message);
+
+    // If MongoDB is connected and the error is a real DB or validation error, return the actual error so user knows!
+    if (mongoose.connection.readyState === 1 && !error.message.includes('offline')) {
+      return res.status(400).json({ message: error.message || 'Failed to create product in database.' });
     }
 
-    const resolvedBrandId = await resolveBrand(brand);
-    const resolvedCategoryId = await resolveCategory(category);
-
-    const product = await Product.create({
-      name,
-      slug,
-      sku,
-      description,
-      price,
-      salePrice,
-      hasCasePricing: Boolean(hasCasePricing),
-      casePrice: casePrice !== undefined && casePrice !== '' ? Number(casePrice) : undefined,
-      caseSalePrice: caseSalePrice !== undefined && caseSalePrice !== '' ? Number(caseSalePrice) : undefined,
-      caseUnitsCount: caseUnitsCount !== undefined && caseUnitsCount !== '' ? Number(caseUnitsCount) : 12,
-      piecePrice: piecePrice !== undefined && piecePrice !== '' ? Number(piecePrice) : Number(price),
-      pieceSalePrice: pieceSalePrice !== undefined && pieceSalePrice !== '' ? Number(pieceSalePrice) : (salePrice ? Number(salePrice) : undefined),
-      hasColors: Boolean(hasColors),
-      colors: Array.isArray(colors) ? colors : (typeof colors === 'string' && colors ? colors.split(',').map((c: string) => c.trim()).filter(Boolean) : []),
-      stockQuantity,
-      images,
-      brand: resolvedBrandId,
-      category: resolvedCategoryId,
-      status,
-      tags,
-      isFeatured,
-      specifications
-    });
-
-    const populated = await Product.findById(product._id).populate('brand').populate('category');
-    res.status(201).json(populated || product);
-  } catch (error: any) {
-    console.error('Error creating product in DB, returning fallback response:', error.message);
-    // Find matching brand and category objects for UI display
+    // Offline / fallback mode: create in-memory and keep in fallbackProducts
     const matchedBrand = fallbackBrands.find(b => b._id === brand || b.name.toLowerCase() === String(brand).toLowerCase()) || { _id: brand, name: typeof brand === 'string' && brand ? brand : 'Yonex' };
     const matchedCategory = fallbackCategories.find(c => c._id === category || c.name.toLowerCase() === String(category).toLowerCase()) || { _id: category, name: typeof category === 'string' && category ? category : 'Badminton Rackets' };
 
-    const simulatedProduct = {
+    const simulatedProduct: any = {
       _id: '65' + Math.random().toString(16).slice(2, 26).padEnd(22, '0'),
       name: name || 'New Badminton Product',
       slug,
-      sku: sku || 'SKU-' + Date.now().toString().slice(-4),
+      sku: cleanSku,
       description: description || '',
-      price: Number(price) || 0,
+      price: finalPrice,
       salePrice: salePrice ? Number(salePrice) : undefined,
       hasCasePricing: Boolean(hasCasePricing),
       casePrice: casePrice ? Number(casePrice) : undefined,
       caseSalePrice: caseSalePrice ? Number(caseSalePrice) : undefined,
       caseUnitsCount: caseUnitsCount ? Number(caseUnitsCount) : 12,
-      piecePrice: piecePrice ? Number(piecePrice) : Number(price),
+      piecePrice: piecePrice ? Number(piecePrice) : finalPrice,
       pieceSalePrice: pieceSalePrice ? Number(pieceSalePrice) : (salePrice ? Number(salePrice) : undefined),
       hasColors: Boolean(hasColors),
       colors: Array.isArray(colors) ? colors : [],
-      stockQuantity: Number(stockQuantity) || 0,
-      images: Array.isArray(images) && images.length > 0 ? images : ['/imgs/hero_rackets.png'],
+      hasSizes: hasSizesBool,
+      sizes: parsedSizes,
+      stockQuantity: finalStock,
+      images: cleanImages,
       brand: matchedBrand,
       category: matchedCategory,
       status: status || 'active',
       tags: Array.isArray(tags) ? tags : [],
       isFeatured: Boolean(isFeatured),
-      specifications: Array.isArray(specifications) ? specifications : []
+      specifications: cleanSpecs
     };
+
+    // Keep in in-memory fallback list so it won't disappear on subsequent fetches!
+    fallbackProducts.unshift(simulatedProduct);
     res.status(201).json(simulatedProduct);
   }
 });
@@ -599,14 +654,20 @@ router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermissio
   try {
     const product = await Product.findById(req.params.id);
     if (!product) {
-      res.json({ _id: req.params.id, ...req.body });
-      return;
+      // Check in fallbackProducts
+      const fbIdx = fallbackProducts.findIndex(p => p._id === req.params.id);
+      if (fbIdx !== -1) {
+        fallbackProducts[fbIdx] = { ...fallbackProducts[fbIdx], ...req.body };
+        return res.json(fallbackProducts[fbIdx]);
+      }
+      return res.status(404).json({ message: 'Product not found' });
     }
 
     const {
       name, sku, description, price, salePrice,
       hasCasePricing, casePrice, caseSalePrice, caseUnitsCount, piecePrice, pieceSalePrice,
       hasColors, colors,
+      hasSizes, sizes,
       stockQuantity, images, brand, category, status, tags, isFeatured, specifications
     } = req.body;
 
@@ -615,22 +676,49 @@ router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermissio
       product.slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
     }
     
-    product.sku = sku || product.sku;
+    if (sku && sku.trim().toUpperCase() !== product.sku) {
+      const cleanSku = sku.trim().toUpperCase();
+      const duplicateSku = await Product.findOne({
+        _id: { $ne: product._id },
+        sku: { $regex: new RegExp(`^${cleanSku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+      if (duplicateSku) {
+        return res.status(400).json({ message: `A product with SKU "${cleanSku}" already exists.` });
+      }
+      product.sku = cleanSku;
+    }
+
     product.description = description !== undefined ? description : product.description;
-    product.price = price !== undefined ? price : product.price;
-    product.salePrice = salePrice !== undefined ? salePrice : product.salePrice;
+    product.price = price !== undefined ? Number(price) : product.price;
+    product.salePrice = salePrice !== undefined && salePrice !== '' ? Number(salePrice) : undefined;
     product.hasCasePricing = hasCasePricing !== undefined ? Boolean(hasCasePricing) : product.hasCasePricing;
     product.casePrice = casePrice !== undefined && casePrice !== '' ? Number(casePrice) : undefined;
     product.caseSalePrice = caseSalePrice !== undefined && caseSalePrice !== '' ? Number(caseSalePrice) : undefined;
     product.caseUnitsCount = caseUnitsCount !== undefined && caseUnitsCount !== '' ? Number(caseUnitsCount) : (product.caseUnitsCount || 12);
     product.piecePrice = piecePrice !== undefined && piecePrice !== '' ? Number(piecePrice) : (product.piecePrice || Number(price));
     product.pieceSalePrice = pieceSalePrice !== undefined && pieceSalePrice !== '' ? Number(pieceSalePrice) : undefined;
+    
     product.hasColors = hasColors !== undefined ? Boolean(hasColors) : product.hasColors;
     if (colors !== undefined) {
       product.colors = Array.isArray(colors) ? colors : (typeof colors === 'string' && colors ? colors.split(',').map((c: string) => c.trim()).filter(Boolean) : []);
     }
-    product.stockQuantity = stockQuantity !== undefined ? stockQuantity : product.stockQuantity;
-    product.images = images || product.images;
+
+    if (hasSizes !== undefined) {
+      product.hasSizes = Boolean(hasSizes);
+    }
+    if (sizes !== undefined) {
+      product.sizes = Array.isArray(sizes)
+        ? sizes.map((s: any) => String(s).trim()).filter(Boolean)
+        : (typeof sizes === 'string' && sizes ? sizes.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+      if (product.sizes.length > 0) {
+        product.hasSizes = true;
+      }
+    }
+
+    product.stockQuantity = stockQuantity !== undefined ? Number(stockQuantity) : product.stockQuantity;
+    if (images && Array.isArray(images) && images.length > 0) {
+      product.images = images.filter((img: any) => typeof img === 'string' && img.trim().length > 0);
+    }
     if (brand) {
       product.brand = await resolveBrand(brand);
     }
@@ -638,16 +726,23 @@ router.put('/:id', protect, restrictTo('SUPER_ADMIN', 'STAFF'), requirePermissio
       product.category = await resolveCategory(category);
     }
     product.status = status || product.status;
-    product.tags = tags || product.tags;
+    product.tags = Array.isArray(tags) ? tags : product.tags;
     product.isFeatured = isFeatured !== undefined ? isFeatured : product.isFeatured;
-    product.specifications = specifications || product.specifications;
+    
+    if (specifications !== undefined) {
+      product.specifications = Array.isArray(specifications)
+        ? specifications
+            .filter((s: any) => s && typeof s === 'object' && s.key && String(s.key).trim() && s.value && String(s.value).trim())
+            .map((s: any) => ({ key: String(s.key).trim(), value: String(s.value).trim() }))
+        : [];
+    }
 
     const updated = await product.save();
     const populated = await Product.findById(updated._id).populate('brand').populate('category');
     res.json(populated || updated);
   } catch (error: any) {
-    console.error('Error updating product in DB, returning updated payload:', error.message);
-    res.json({ _id: req.params.id, ...req.body });
+    console.error('Error updating product in DB:', error.message);
+    res.status(400).json({ message: error.message || 'Failed to update product.' });
   }
 });
 

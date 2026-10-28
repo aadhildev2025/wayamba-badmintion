@@ -9,6 +9,7 @@ interface CartItem {
   images?: string[];
   brand?: { name: string };
   selectedColor?: string;
+  selectedSize?: string;
   selectedUnit?: string;
   quantity: number;
   stockQuantity: number;

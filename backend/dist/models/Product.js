@@ -53,6 +53,8 @@ const ProductSchema = new mongoose_1.Schema({
     pieceSalePrice: { type: Number, min: 0 },
     hasColors: { type: Boolean, default: false },
     colors: [{ type: String }],
+    hasSizes: { type: Boolean, default: false },
+    sizes: [{ type: String }],
     stockQuantity: { type: Number, required: true, default: 0, min: 0 },
     images: [{ type: String }],
     brand: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Brand', required: true },

@@ -34,6 +34,8 @@ interface Product {
   pieceSalePrice?: number;
   hasColors?: boolean;
   colors?: string[];
+  hasSizes?: boolean;
+  sizes?: string[];
   stockQuantity: number;
   images: string[];
   brand: string | { _id: string; name: string };
@@ -72,6 +74,10 @@ export default function AdminProducts() {
   const [hasColors, setHasColors] = useState(false);
   const [colorList, setColorList] = useState<string[]>([]);
   const [pickerColor, setPickerColor] = useState('#B01C28');
+  const [hasSizes, setHasSizes] = useState(false);
+  const [sizeList, setSizeList] = useState<string[]>([]);
+  const [customSizeInput, setCustomSizeInput] = useState('');
+  const [sizePresetTab, setSizePresetTab] = useState<'shoes' | 'jersey'>('shoes');
   const [stockQuantity, setStockQuantity] = useState<number | string>('');
   const [imageList, setImageList] = useState<string[]>([]);
   const [brandId, setBrandId] = useState('');
@@ -384,6 +390,18 @@ export default function AdminProducts() {
       setHasColors(hasProdColors);
       setColorList(Array.isArray(prod.colors) ? prod.colors : []);
       setPickerColor('#B01C28');
+      
+      const hasProdSizes = Boolean(prod.hasSizes || (Array.isArray(prod.sizes) && prod.sizes.length > 0));
+      setHasSizes(hasProdSizes);
+      setSizeList(Array.isArray(prod.sizes) ? prod.sizes : []);
+      setCustomSizeInput('');
+      const prodCatName = (typeof prod.category === 'object' ? prod.category.name : '').toLowerCase();
+      if (prodCatName.includes('shoe') || prodCatName.includes('footwear') || prod.name.toLowerCase().includes('shoe')) {
+        setSizePresetTab('shoes');
+      } else if (prodCatName.includes('jersey') || prodCatName.includes('apparel') || prodCatName.includes('shirt') || prodCatName.includes('jercy') || prod.name.toLowerCase().includes('jersey')) {
+        setSizePresetTab('jersey');
+      }
+
       setStockQuantity(prod.stockQuantity ?? '');
       
       const rawImgs = Array.isArray(prod.images) ? prod.images : [];
@@ -418,6 +436,17 @@ export default function AdminProducts() {
       setHasColors(false);
       setColorList([]);
       setPickerColor('#B01C28');
+      
+      const firstCatId = categories[0]?._id || '';
+      const firstCat = categories.find(c => c._id === firstCatId);
+      const firstCatName = (firstCat?.name || '').toLowerCase();
+      const isShoe = firstCatName.includes('shoe') || firstCatName.includes('footwear');
+      const isJersey = firstCatName.includes('jersey') || firstCatName.includes('apparel') || firstCatName.includes('shirt') || firstCatName.includes('jercy');
+      setHasSizes(isShoe || isJersey);
+      setSizeList([]);
+      setCustomSizeInput('');
+      setSizePresetTab(isJersey ? 'jersey' : 'shoes');
+
       setStockQuantity('');
       setImageList([]);
       setBrandId(brands[0]?._id || '');
@@ -441,6 +470,74 @@ export default function AdminProducts() {
     setColorList(prev => prev.filter((_, i) => i !== idx));
   };
 
+  // Size Presets & Handlers
+  const SHOE_SIZE_PRESETS_UK = ['UK 6', 'UK 6.5', 'UK 7', 'UK 7.5', 'UK 8', 'UK 8.5', 'UK 9', 'UK 9.5', 'UK 10', 'UK 10.5', 'UK 11', 'UK 12'];
+  const SHOE_SIZE_PRESETS_EU = ['EU 38', 'EU 39', 'EU 40', 'EU 41', 'EU 42', 'EU 43', 'EU 44', 'EU 45', 'EU 46'];
+  const JERSEY_SIZE_PRESETS = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+  const JERSEY_KIDS_PRESETS = ['Kids S', 'Kids M', 'Kids L', 'Kids XL'];
+
+  const handleToggleSize = (sizeToAdd: string) => {
+    const val = sizeToAdd.trim();
+    if (!val) return;
+    if (sizeList.some(s => s.toLowerCase() === val.toLowerCase())) {
+      setSizeList(prev => prev.filter(s => s.toLowerCase() !== val.toLowerCase()));
+    } else {
+      setSizeList(prev => [...prev, val]);
+    }
+  };
+
+  const handleAddCustomSize = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const val = customSizeInput.trim();
+    if (!val) return;
+    if (!sizeList.some(s => s.toLowerCase() === val.toLowerCase())) {
+      setSizeList(prev => [...prev, val]);
+    }
+    setCustomSizeInput('');
+  };
+
+  const handleAddAllSizes = (sizesToAdd: string[]) => {
+    setSizeList(prev => {
+      const set = new Set([...prev, ...sizesToAdd]);
+      return Array.from(set);
+    });
+  };
+
+  const handleClearAllSizes = () => {
+    setSizeList([]);
+  };
+
+  const handleAutoGenerateSku = () => {
+    const cat = categories.find(c => c._id === categoryId);
+    const br = brands.find(b => b._id === brandId);
+    const brandPrefix = (br?.name || 'WBH').slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
+    let typePrefix = 'EQP';
+    const catLower = (cat?.name || '').toLowerCase();
+    if (catLower.includes('shoe') || catLower.includes('footwear')) typePrefix = 'SHOE';
+    else if (catLower.includes('jersey') || catLower.includes('apparel') || catLower.includes('shirt') || catLower.includes('jercy')) typePrefix = 'JRS';
+    else if (catLower.includes('racket')) typePrefix = 'RKT';
+    else if (catLower.includes('shuttle')) typePrefix = 'SHT';
+    else if (catLower.includes('cricket')) typePrefix = 'CRK';
+    else if (catLower.includes('tennis')) typePrefix = 'TNS';
+    else if (catLower.includes('bag')) typePrefix = 'BAG';
+
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    setSku(`${brandPrefix}-${typePrefix}-${rand}`);
+  };
+
+  const handleCategoryChangeAutoSizes = (newCatId: string) => {
+    setCategoryId(newCatId);
+    const cat = categories.find(c => c._id === newCatId);
+    const catName = (cat?.name || '').toLowerCase();
+    if (catName.includes('shoe') || catName.includes('footwear')) {
+      setHasSizes(true);
+      setSizePresetTab('shoes');
+    } else if (catName.includes('jersey') || catName.includes('apparel') || catName.includes('shirt') || catName.includes('jercy')) {
+      setHasSizes(true);
+      setSizePresetTab('jersey');
+    }
+  };
+
   const handleAddSpec = () => {
     if (specKey.trim() && specVal.trim()) {
       setSpecList([...specList, { key: specKey.trim(), value: specVal.trim() }]);
@@ -459,7 +556,7 @@ export default function AdminProducts() {
     const salePriceVal = salePrice ? Number(salePrice) : undefined;
     const finalPrice = priceVal > 0 ? priceVal : (salePriceVal && salePriceVal > 0 ? salePriceVal : 0);
 
-    let resolvedBrand = brandId;
+    let resolvedBrand = brandId || (brands[0]?._id || '');
     if (brandId === '__new_custom__' && customBrandName.trim()) {
       try {
         const brandRes = await api.post('/products/brands', { name: customBrandName.trim() });
@@ -469,7 +566,7 @@ export default function AdminProducts() {
       }
     }
 
-    let resolvedCategory = categoryId;
+    let resolvedCategory = categoryId || (categories[0]?._id || '');
     if (categoryId === '__new_custom__' && customCategoryName.trim()) {
       try {
         const catRes = await api.post('/products/categories', { name: customCategoryName.trim() });
@@ -479,16 +576,26 @@ export default function AdminProducts() {
       }
     }
 
-    if (!name || !sku || !resolvedBrand || resolvedBrand === '__new_custom__' || !resolvedCategory || resolvedCategory === '__new_custom__' || finalPrice <= 0) {
-      alert('Name, SKU, Brand, Category, and a valid Regular Price (> 0) are required.');
+    // Auto-generate SKU if left blank so saving never fails due to missing SKU
+    let finalSku = sku.trim();
+    if (!finalSku) {
+      const br = brands.find(b => b._id === resolvedBrand);
+      const brandPrefix = (br?.name || 'WBH').slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
+      const rand = Math.floor(1000 + Math.random() * 9000);
+      finalSku = `${brandPrefix}-${Date.now().toString().slice(-4)}-${rand}`;
+      setSku(finalSku);
+    }
+
+    if (!name.trim() || !resolvedBrand || resolvedBrand === '__new_custom__' || !resolvedCategory || resolvedCategory === '__new_custom__' || finalPrice <= 0) {
+      alert('Product Name, Brand, Category, and a valid Regular Price (> 0) are required.');
       return;
     }
     
     setModalLoading(true);
 
     const payload = {
-      name,
-      sku,
+      name: name.trim(),
+      sku: finalSku,
       description,
       price: finalPrice,
       salePrice: salePriceVal,
@@ -500,14 +607,16 @@ export default function AdminProducts() {
       pieceSalePrice: salePriceVal,
       hasColors: Boolean(hasColors),
       colors: hasColors ? colorList : [],
-      stockQuantity: Number(stockQuantity),
+      hasSizes: Boolean(hasSizes && sizeList.length > 0),
+      sizes: hasSizes ? sizeList : [],
+      stockQuantity: isNaN(Number(stockQuantity)) ? 0 : Number(stockQuantity),
       images: imageList,
       brand: resolvedBrand,
       category: resolvedCategory,
       status,
       tags: tagsInput.split(',').map(s => s.trim()).filter(Boolean),
       isFeatured,
-      specifications: specList,
+      specifications: specList.filter(s => s && s.key && s.key.trim() && s.value && s.value.trim()),
     };
 
     try {
@@ -524,7 +633,8 @@ export default function AdminProducts() {
       fetchLists();
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.message || 'Failed to save product');
+      const serverMsg = err.response?.data?.message || err.message || 'Failed to save product';
+      alert(`Could not save product: ${serverMsg}`);
     } finally {
       setModalLoading(false);
     }
@@ -722,6 +832,30 @@ export default function AdminProducts() {
                           ))}
                         </div>
                       )}
+                      {p.sizes && p.sizes.length > 0 && (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 5, alignItems: 'center' }}>
+                          <span style={{ fontSize: 9.5, fontWeight: 900, color: '#38BDF8', fontFamily: 'Outfit', letterSpacing: 0.5 }}>SIZES:</span>
+                          {p.sizes.slice(0, 5).map((sz, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                fontSize: 10, fontWeight: 700, fontFamily: 'Outfit',
+                                padding: '1px 6px', borderRadius: 4,
+                                background: 'rgba(56,189,248,0.12)',
+                                border: '1px solid rgba(56,189,248,0.3)',
+                                color: '#BAE6FD',
+                              }}
+                            >
+                              {sz}
+                            </span>
+                          ))}
+                          {p.sizes.length > 5 && (
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'Outfit', fontWeight: 700 }}>
+                              +{p.sizes.length - 5}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace', fontWeight: 600 }}>{p.sku}</div>
@@ -827,10 +961,27 @@ export default function AdminProducts() {
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>SKU Code</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <label style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.8)', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        SKU Code
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAutoGenerateSku}
+                        title="Auto-generate a smart unique SKU"
+                        style={{
+                          background: 'rgba(250,204,21,0.12)', border: '1px solid rgba(250,204,21,0.3)',
+                          color: '#FACC15', fontSize: 11, fontWeight: 800, fontFamily: 'Outfit',
+                          cursor: 'pointer', padding: '2px 8px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4,
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        ⚡ Generate SKU
+                      </button>
+                    </div>
                     <input
                       type="text"
-                      placeholder="e.g. YNX-AX100ZZ"
+                      placeholder="e.g. YNX-SHOE-7821 (or leave blank to auto-generate)"
                       value={sku}
                       onChange={e => setSku(e.target.value)}
                       style={{
@@ -838,7 +989,6 @@ export default function AdminProducts() {
                         border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 14,
                         color: '#FFFFFF', fontSize: 14, fontFamily: 'monospace', outline: 'none'
                       }}
-                      required
                     />
                   </div>
                 </div>
@@ -1203,6 +1353,317 @@ export default function AdminProducts() {
                   )}
                 </div>
 
+                {/* Section 2.7: Size Selection (Shoes, Jerseys & Apparel) */}
+                {(() => {
+                  const selectedCatObj = categories.find(c => c._id === categoryId);
+                  const catName = (selectedCatObj?.name || (typeof selectedProduct?.category === 'object' ? selectedProduct.category.name : '') || categoryId || '').toLowerCase();
+                  const isShoe = catName.includes('shoe') || catName.includes('footwear') || catName.includes('sneaker') || name.toLowerCase().includes('shoe');
+                  const isJersey = catName.includes('jersey') || catName.includes('apparel') || catName.includes('shirt') || catName.includes('t-shirt') || catName.includes('clothing') || catName.includes('jercy') || name.toLowerCase().includes('jersey');
+
+                  return (
+                    <div style={{
+                      padding: 16,
+                      borderRadius: 16,
+                      background: hasSizes ? 'rgba(56,189,248,0.08)' : '#161622',
+                      border: hasSizes ? '1.5px solid rgba(56,189,248,0.45)' : '1.5px solid rgba(255,255,255,0.12)',
+                      transition: 'all 0.25s ease'
+                    }}>
+                      <label
+                        htmlFor="hasSizes"
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', userSelect: 'none' }}
+                      >
+                        <input
+                          type="checkbox"
+                          id="hasSizes"
+                          checked={hasSizes}
+                          onChange={e => {
+                            setHasSizes(e.target.checked);
+                            if (e.target.checked) {
+                              if (isJersey && !isShoe) setSizePresetTab('jersey');
+                              else setSizePresetTab('shoes');
+                            }
+                          }}
+                          style={{ width: 18, height: 18, accentColor: '#38BDF8', cursor: 'pointer' }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#FFFFFF', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span>Available Size Options (Shoes, Jerseys & Apparel)</span>
+                            {isShoe && (
+                              <span style={{ fontSize: 10, fontWeight: 900, background: '#0284C7', color: '#fff', padding: '2px 8px', borderRadius: 6, fontFamily: 'Outfit' }}>
+                                👟 SHOES DETECTED
+                              </span>
+                            )}
+                            {isJersey && (
+                              <span style={{ fontSize: 10, fontWeight: 900, background: '#7C3AED', color: '#fff', padding: '2px 8px', borderRadius: 6, fontFamily: 'Outfit' }}>
+                                👕 JERSEY DETECTED
+                              </span>
+                            )}
+                            {hasSizes && (
+                              <span style={{ fontSize: 10, fontWeight: 900, background: '#38BDF8', color: '#0F172A', padding: '2px 8px', borderRadius: 6, fontFamily: 'Outfit' }}>
+                                {sizeList.length} SIZES SELECTED
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter', marginTop: 2 }}>
+                            Enable to allow customers to choose shoe sizes (e.g. UK 7-11) or jersey sizes (S, M, L, XL, XXL) before ordering.
+                          </div>
+                        </div>
+                      </label>
+
+                      {hasSizes && (
+                        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                          {/* Tab switch between Shoes and Jersey presets */}
+                          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                            <button
+                              type="button"
+                              onClick={() => setSizePresetTab('shoes')}
+                              style={{
+                                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 800, fontFamily: 'Outfit', cursor: 'pointer',
+                                background: sizePresetTab === 'shoes' ? '#0284C7' : 'rgba(255,255,255,0.06)',
+                                color: sizePresetTab === 'shoes' ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                                border: sizePresetTab === 'shoes' ? '1px solid #38BDF8' : '1px solid rgba(255,255,255,0.1)',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              👟 Shoes Size Presets (UK / EU)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSizePresetTab('jersey')}
+                              style={{
+                                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 800, fontFamily: 'Outfit', cursor: 'pointer',
+                                background: sizePresetTab === 'jersey' ? '#7C3AED' : 'rgba(255,255,255,0.06)',
+                                color: sizePresetTab === 'jersey' ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                                border: sizePresetTab === 'jersey' ? '1px solid #A78BFA' : '1px solid rgba(255,255,255,0.1)',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              👕 Jersey & Apparel Presets (XS - 4XL)
+                            </button>
+                          </div>
+
+                          {/* Shoe Presets */}
+                          {sizePresetTab === 'shoes' && (
+                            <div style={{ marginBottom: 16 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Outfit' }}>
+                                  UK Shoe Sizes (Click to toggle):
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddAllSizes(['UK 7', 'UK 7.5', 'UK 8', 'UK 8.5', 'UK 9', 'UK 9.5', 'UK 10'])}
+                                  style={{
+                                    background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)',
+                                    color: '#38BDF8', fontSize: 11, fontWeight: 800, fontFamily: 'Outfit',
+                                    padding: '2px 8px', borderRadius: 6, cursor: 'pointer'
+                                  }}
+                                >
+                                  + Add Standard (UK 7 - 10)
+                                </button>
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                                {SHOE_SIZE_PRESETS_UK.map(s => {
+                                  const isSel = sizeList.includes(s);
+                                  return (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => handleToggleSize(s)}
+                                      style={{
+                                        padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800, fontFamily: 'Outfit',
+                                        background: isSel ? '#0284C7' : 'rgba(255,255,255,0.06)',
+                                        color: isSel ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                                        border: isSel ? '1.5px solid #38BDF8' : '1px solid rgba(255,255,255,0.12)',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                                        boxShadow: isSel ? '0 0 10px rgba(56,189,248,0.4)' : 'none',
+                                        transition: 'all 0.15s'
+                                      }}
+                                    >
+                                      {isSel && <span>✓</span>} {s}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Outfit', marginBottom: 6 }}>
+                                European / Numeric Sizes:
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {SHOE_SIZE_PRESETS_EU.map(s => {
+                                  const isSel = sizeList.includes(s);
+                                  return (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => handleToggleSize(s)}
+                                      style={{
+                                        padding: '4px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 800, fontFamily: 'Outfit',
+                                        background: isSel ? '#0284C7' : 'rgba(255,255,255,0.04)',
+                                        color: isSel ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                                        border: isSel ? '1.5px solid #38BDF8' : '1px solid rgba(255,255,255,0.1)',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                                        transition: 'all 0.15s'
+                                      }}
+                                    >
+                                      {isSel && <span>✓</span>} {s}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Jersey Presets */}
+                          {sizePresetTab === 'jersey' && (
+                            <div style={{ marginBottom: 16 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Outfit' }}>
+                                  Adult Jersey Sizes (Click to toggle):
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddAllSizes(['S', 'M', 'L', 'XL', '2XL'])}
+                                  style={{
+                                    background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)',
+                                    color: '#C4B5FD', fontSize: 11, fontWeight: 800, fontFamily: 'Outfit',
+                                    padding: '2px 8px', borderRadius: 6, cursor: 'pointer'
+                                  }}
+                                >
+                                  + Add Standard (S - 2XL)
+                                </button>
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                                {JERSEY_SIZE_PRESETS.map(s => {
+                                  const isSel = sizeList.includes(s);
+                                  return (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => handleToggleSize(s)}
+                                      style={{
+                                        padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 800, fontFamily: 'Outfit',
+                                        background: isSel ? '#7C3AED' : 'rgba(255,255,255,0.06)',
+                                        color: isSel ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                                        border: isSel ? '1.5px solid #A78BFA' : '1px solid rgba(255,255,255,0.12)',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                                        boxShadow: isSel ? '0 0 10px rgba(167,139,250,0.4)' : 'none',
+                                        transition: 'all 0.15s'
+                                      }}
+                                    >
+                                      {isSel && <span>✓</span>} {s}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Outfit', marginBottom: 6 }}>
+                                Junior & Kids Sizes:
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {JERSEY_KIDS_PRESETS.map(s => {
+                                  const isSel = sizeList.includes(s);
+                                  return (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => handleToggleSize(s)}
+                                      style={{
+                                        padding: '4px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 800, fontFamily: 'Outfit',
+                                        background: isSel ? '#7C3AED' : 'rgba(255,255,255,0.04)',
+                                        color: isSel ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                                        border: isSel ? '1.5px solid #A78BFA' : '1px solid rgba(255,255,255,0.1)',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                                        transition: 'all 0.15s'
+                                      }}
+                                    >
+                                      {isSel && <span>✓</span>} {s}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Custom Size Input */}
+                          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                            <input
+                              type="text"
+                              placeholder="Or type custom size (e.g. UK 8.5, 43 EU, 3XL, Slim L...)"
+                              value={customSizeInput}
+                              onChange={e => setCustomSizeInput(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomSize(); } }}
+                              style={{
+                                flex: 1, padding: '9px 14px', background: '#12121C',
+                                border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 10,
+                                color: '#FFFFFF', fontSize: 13, fontFamily: 'Outfit', outline: 'none'
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddCustomSize()}
+                              style={{
+                                padding: '9px 16px', borderRadius: 10, background: '#38BDF8', color: '#0F172A',
+                                border: 'none', fontWeight: 800, fontSize: 13, fontFamily: 'Outfit', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0
+                              }}
+                            >
+                              <Plus size={14} /> Add Size
+                            </button>
+                          </div>
+
+                          {/* Active Selected Sizes List */}
+                          {sizeList.length > 0 ? (
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Outfit' }}>
+                                  Configured Sizes for this Product ({sizeList.length}):
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={handleClearAllSizes}
+                                  style={{ background: 'none', border: 'none', color: '#F87171', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                                >
+                                  Clear All
+                                </button>
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                {sizeList.map((sz, idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                                      padding: '4px 10px', borderRadius: 8,
+                                      background: 'rgba(56,189,248,0.14)', border: '1px solid rgba(56,189,248,0.35)',
+                                      color: '#E0F2FE', fontSize: 12.5, fontWeight: 800, fontFamily: 'Outfit'
+                                    }}
+                                  >
+                                    <span>{sz}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleSize(sz)}
+                                      title={`Remove size ${sz}`}
+                                      style={{
+                                        background: 'none', border: 'none', color: '#BAE6FD',
+                                        cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center'
+                                      }}
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+                              No sizes added yet. Click preset sizes above or type a custom size.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Section 3: Brand & Category */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
                   <div>
@@ -1277,11 +1738,12 @@ export default function AdminProducts() {
                     <select
                       value={categoryId}
                       onChange={e => {
-                        if (e.target.value === '__new_custom__') {
+                        const val = e.target.value;
+                        if (val === '__new_custom__') {
                           setCategoryModalOpen(true);
                           setCustomCategoryName('');
                         } else {
-                          setCategoryId(e.target.value);
+                          handleCategoryChangeAutoSizes(val);
                         }
                       }}
                       style={{

@@ -16,6 +16,7 @@ interface ProductData {
   hasCasePricing?: boolean; casePrice?: number; caseSalePrice?: number; caseUnitsCount?: number;
   piecePrice?: number; pieceSalePrice?: number;
   hasColors?: boolean; colors?: string[];
+  hasSizes?: boolean; sizes?: string[];
   images?: { url: string; public_id?: string }[];
   brand?: { name: string }; category?: { name: string };
   stockQuantity: number; specifications?: any;
@@ -38,6 +39,7 @@ export default function ProductDetail() {
   const [imgIndex, setImgIndex] = useState(0);
   const [selectedUnit, setSelectedUnit] = useState<'piece' | 'case'>('piece');
   const [selectedColor, setSelectedColor] = useState<string>('');
+  const [selectedSize, setSelectedSize] = useState<string>('');
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [wishlist, setWishlist] = useState(false);
@@ -117,6 +119,9 @@ export default function ProductDetail() {
         if (prod?.colors && Array.isArray(prod.colors) && prod.colors.length > 0) {
           setSelectedColor(prod.colors[0]);
         }
+        if (prod?.sizes && Array.isArray(prod.sizes) && prod.sizes.length > 0) {
+          setSelectedSize(prod.sizes[0]);
+        }
         if (res.data?.reviews && Array.isArray(res.data.reviews)) {
           setReviews(res.data.reviews);
         }
@@ -128,6 +133,9 @@ export default function ProductDetail() {
           setProduct(fb as any);
           if (fb?.colors && Array.isArray(fb.colors) && fb.colors.length > 0) {
             setSelectedColor(fb.colors[0]);
+          }
+          if (fb?.sizes && Array.isArray(fb.sizes) && fb.sizes.length > 0) {
+            setSelectedSize(fb.sizes[0]);
           }
         } else {
           setProduct(FALLBACK_PRODUCTS[0] as any);
@@ -168,14 +176,19 @@ export default function ProductDetail() {
       ? `Case (${product.caseUnitsCount || 12} pcs)`
       : (product.hasCasePricing ? 'Single Piece' : '');
     const activeColor = selectedColor || (product.colors && product.colors.length > 0 ? product.colors[0] : '');
+    const activeSize = selectedSize || (product.sizes && product.sizes.length > 0 ? product.sizes[0] : '');
 
     const details: string[] = [];
+    if (activeSize) details.push(`Size: ${activeSize}`);
     if (activeColor) details.push(activeColor);
     if (unitLabel) details.push(unitLabel);
     const detailString = details.length > 0 ? ` (${details.join(' - ')})` : '';
 
     const itemName = `${product.name}${detailString}`;
-    const cartItemId = `${product._id}${activeColor ? `-${activeColor.replace(/\s+/g, '_')}` : ''}${isCase ? '-case' : (product.hasCasePricing ? '-piece' : '')}`;
+    const sizePart = activeSize ? `-${activeSize.replace(/\s+/g, '_')}` : '';
+    const colorPart = activeColor ? `-${activeColor.replace(/\s+/g, '_')}` : '';
+    const unitPart = isCase ? '-case' : (product.hasCasePricing ? '-piece' : '');
+    const cartItemId = `${product._id}${sizePart}${colorPart}${unitPart}`;
 
     addToCart({
       _id: cartItemId,
@@ -187,6 +200,7 @@ export default function ProductDetail() {
       brand: product.brand,
       selectedUnit: unitLabel,
       selectedColor: activeColor,
+      selectedSize: activeSize,
       stockQuantity: product.stockQuantity ?? 10
     });
     setAdded(true);
@@ -469,6 +483,54 @@ export default function ProductDetail() {
             <p style={{ color: 'var(--t2)', fontSize: 15.5, lineHeight: 1.75 }}>
               {product.description || 'Professional equipment engineered for high performance, maximum durability, and court dominance.'}
             </p>
+
+            {/* Size Variant Selector (for Shoes, Jerseys & Sized Apparel) */}
+            {product.sizes && product.sizes.length > 0 && (
+              <div style={{ background: 'var(--bg-3)', padding: '16px', borderRadius: 16, border: '1px solid var(--b2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: 'Outfit' }}>
+                    Select Size:
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--red-vivid)', fontFamily: 'Outfit', fontWeight: 800 }}>
+                    {selectedSize ? `Selected: ${selectedSize}` : `${product.sizes.length} Sizes Available`}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {product.sizes.map((sz) => {
+                    const isSel = (selectedSize || product.sizes?.[0]) === sz;
+
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => setSelectedSize(sz)}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: 10,
+                          background: isSel ? 'rgba(176,28,40,0.18)' : 'rgba(255,255,255,0.04)',
+                          border: isSel ? '2px solid var(--red-vivid)' : '1px solid var(--b1)',
+                          color: isSel ? '#FFFFFF' : 'var(--t2)',
+                          fontFamily: 'Outfit',
+                          fontSize: 13.5,
+                          fontWeight: isSel ? 900 : 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          boxShadow: isSel ? '0 0 12px rgba(176,28,40,0.4)' : 'none',
+                          transform: isSel ? 'scale(1.04)' : 'scale(1)',
+                          transition: 'all 0.18s ease'
+                        }}
+                      >
+                        {isSel && <Check size={14} strokeWidth={3} style={{ color: 'var(--red-vivid)' }} />}
+                        <span>{sz}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Color Variant Selector */}
             {product.colors && product.colors.length > 0 && (
